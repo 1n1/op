@@ -1151,7 +1151,7 @@ if [ -z "${op_default:-}" ]; then
 elif [ -e "$op_default" ]; then
   if sh -n -- "$op_default"; then
     if . "$op_default"; then
-      [ "$verbose" -eq 1 ] || printf "Finished %s\n" "${green}OK${normal}"
+      printf "Finished %s\n" "${green}OK${normal}"
     else
       die "exit with code: ${red}${?}${normal}"
     fi
