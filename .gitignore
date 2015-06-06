@@ -1,0 +1,10 @@
+
+logs/
+rollback/
+
+files/etc/ssl/
+files/etc/ssh/moduli
+files/etc/ssh/ssh_host_key*
+!files/root/.ssh/ssh_config
+!files/home/*/.ssh/ssh_config
+
