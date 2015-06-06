@@ -1,0 +1,1166 @@
+#!/bin/sh
+
+#  _________________________________________________________________
+# /\                                                                \
+# \/|                                                               |
+#   | op - Support tool and micro Config Management System          |
+#   |                                                               |
+#   | Operational definitions pure /bin/sh                          |
+#   |                                                               |
+#   |   ____________________________________________________________|
+#    \_/____________________________________________________________/
+#
+#
+# Copyright (C) 2015, Iñigo Tejedor Arrondo <http://inigo.me/>
+#
+# All rights reserved.
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+
+set -eu
+
+work_dir="$( pwd )"
+
+#
+# This is only for root
+#
+if [ "$(id -u)" -ne 0 ]; then
+  echo >&2 "Only for root. Maybe you can use sudo. Exiting."
+  exit 1
+fi
+
+version=0.0.2
+
+# Reflect renames of our own name, on messages, etc)
+op=${0##*/}
+
+# The master copy of the managed files
+files="$work_dir/files"
+
+# File used to block against parallel sessions
+lock="$work_dir/.lock"
+
+# Directory to save the rollback files
+dir_rollback="$work_dir/rollback"
+
+# By default we're quiet with the program output.
+# Use -v to see all messages.
+verbose=0
+
+# By default we run, use --trial on the command line, for test without apply.
+trial=0
+
+# Colors, use -r or --raw on the command line, to disable them globally.
+nocolor=0
+normal="$(  tput setaf 9; tput sgr0 )"
+red="$(     tput setaf 1; tput bold )"
+green="$(   tput setaf 2; tput bold )"
+yellow="$(  tput setaf 3; tput bold )"
+blue="$(    tput setaf 4; tput bold )"
+magenta="$( tput setaf 5; tput bold )"
+cyan="$(    tput setaf 6; tput bold )"
+white="$(   tput setaf 7; )"
+
+# You can reuse this var in your ops too
+hostname="$( uname -n )"
+
+# Uniq identifier for each run. Used to manage the symlinks to the latest log
+# and the latest rollback
+run_id="$( date +%s ).$hostname.$$"
+
+# Directory to hold the logs
+logs="$work_dir/logs/$(date +%Y/%m/%d)"
+
+# Log file. Use a new one on each run
+log_file="$logs/$(date +%H-%M-%S.%N).log"
+
+# Set to 1 to notify each run results, set to 0 to disable notifications.
+notify_enabled=0
+
+# We start counting like if there were no changes or errors...
+notify=0
+
+# Notify addreses, edit to your needs.
+mail_to="support@example.com"
+mail_cc="changes@example.com"
+
+# Template used for notifications if enabled
+notify_tpl () {
+  cat <<EOF
+Here are attached the changes for this transaction:
+
+ op: $op
+ run: $run_id
+ by $USER${SUDO_USER:+"/$SUDO_USER"}"
+
+Below is the system state, at notification time:
+
+SSH PROCESSES ($$):
+$( ps auxwww | grep -E "(sshd:|$$)" )
+
+W:
+$( w )
+
+WHO:
+$( who -a )
+
+CONNECTIONS:
+$( netstat -platun | grep ssh)
+
+SYSTEM
+$(uptime)
+
+MEMORY
+$(free -m)
+
+FILESYSTEMS
+$(df -Ph | column -t)
+
+FULL PROCESS LIST
+$( ps afuxwww)
+
+
+Yours carefully, the $op tool
+
+EOF
+# This may screw a big fat system...
+# Add to the report wisely if needed...
+#$(
+#if hash lsof; then
+#  echo OPEN FILES
+#  lsof
+#else
+#  echo ''
+#fi
+#)
+}
+
+# help message
+op_help="
+  $op ${blue}v$version $normal <https://inigo.me/projects/$op>
+
+  ${green}USAGE:$normal
+    $op COMMAND [ARGUMENTS]
+
+  ${green}COMMANDS:$normal
+    op OP  ..... Run only OP. By default all ops run. See 'op list'.
+    request .... Runs a parametrized request. See 'request list'
+    trial ...... Trial (do not apply any change, only show actions, combined)
+    undo ... Runs the undo steps, and restores the latest modified ops
+    help ....... Show this help message, and exit
+
+    Sort format (-o) or long format (--op) as well as words (op) are valid.
+
+  ${green}EXAMPLES$normal
+    $op
+    $op op stack trial
+    $op op stack
+    $op undo
+    $op -v --request typeA param1 param2 ...
+
+"
+
+#  _________________________________________________________________
+# /\                                                                \
+# \/|                                                               |
+#   | Output, messages and general functions.                       |
+#   |                                                               |
+#   |   ____________________________________________________________|
+#    \_/____________________________________________________________/
+#
+
+now () { date +'%Y-%m-%d %H:%M:%S.%N'; }
+
+log () {
+  local normal=""
+  local red=""
+  local green=""
+  local yellow=""
+  local blue=""
+  local magenta=""
+  local msg="$(echo "$*" |sed -r 's/\x1b\[[0-9;]*m?//g')"
+  printf -- '[%s] [%s] %s\n' "$(now)" "$USER${SUDO_USER:+"/$SUDO_USER"}" "$msg" >> "$log_file";
+}
+
+assert () {
+  if [ "$verbose" = 1 ]; then
+    printf "$normal[${green}DONE${normal}] %s\n" "$*"
+  fi
+  log "DONE $*"
+}
+
+error () {
+  notify
+  printf "$normal[${red}ERROR${normal}] %s\n" "$*" 2>&1
+  log "ERROR $*"
+}
+
+die () {
+  error "$*"
+  exit 1
+}
+
+info () {
+  if [ "$verbose" = 1 ]; then
+    printf "$normal[${blue}INFO${normal}] ${blue}%s${normal}\n" "$*"
+  fi
+  log "INFO $*"
+}
+
+report () {
+  notify
+  printf "$normal[${yellow}CHANGE${normal}] %s\n" "$*" || :
+  log "CHANGE $*"
+}
+
+cmd () {
+  if [ "$trial" = 0 ]; then
+    notify
+    if [ "$verbose" = 2 ]; then
+      info "$*"
+    fi
+    "$@" 2>&1 | while read -r line; do
+      printf -- '%s\n' "$line"
+      log "$line"
+    done
+  else
+    printf "$normal[${magenta}TRIAL${normal}] %s\n" "$*"
+  fi
+}
+
+notify () {
+  if [ "$notify_enabled" = 1 ]; then
+    notify=1
+  fi
+}
+
+notify_run () {
+
+  if [ "$notify_enabled" = 1 ] && [ "$notify" = 1 ]; then
+    if [ -e "$log_file" ]; then
+      local subject="[$op] [$hostname] $run_id"
+      if [ "$trial" = 1 ]; then
+        cat <<EOF
+From: $op
+To: $notify_to
+Subject: $subject
+Attachment: $log_file
+
+$(notify_tpl)
+EOF
+      else
+        if [ -n "$mail_cc" ]; then
+          mail_dst="$mail_to -c $mail_cc"
+        else
+          mail_dst="$mail_to"
+        fi
+        echo "$(notify_tpl)" | mail -a "$log_file" -s "$subject" "$mail_dst"
+      fi
+    else
+      error "Could not notify, unreadable: $log_file"
+    fi
+  fi
+}
+
+dir_is_empty () {
+  set -- "$1"/*
+  if test -e "$1" || test -L "$1"; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+#  _________________________________________________________________
+# /\                                                                \
+# \/|                                                               |
+#   | Rolling back commands                                         |
+#   |                                                               |
+#   |   ____________________________________________________________|
+#    \_/____________________________________________________________/
+#
+
+#
+# rollback_path - Function used to save modified files and directories.
+#
+# See undo_last_changes too.
+#
+# USAGE
+#   rollback_path /path/to/file
+#
+rollback_path () {
+
+  local file="$1"
+  local target="$dir_rollback/$run_id"
+
+  if [ -f "$1" ] || [ -d "$1" ]; then
+
+    cmd mkdir -p "$target"
+    if [ -L "$dir_rollback/latest" ]; then
+
+      local current="$( readlink $dir_rollback/latest )"
+
+      if [ "X$current" != "X$target" ]; then
+        cmd ln -fns "$dir_rollback/$run_id" "$dir_rollback/latest"
+      fi
+    else
+      cmd ln -s "$dir_rollback/$run_id" "$dir_rollback/latest"
+    fi
+
+    report "Saving rollback: $file"
+    cmd mkdir -p "$target$( dirname "$file" )"
+    cmd cp -a "$file" "$target$file"
+  else
+    error "Cannot read for rollback: $file"
+  fi
+}
+
+#
+# rollback_cmd - Function used to save modified steps.
+#
+# Usually you register a command to do the opposite than the previous or
+# the next command.
+#
+# See undo_last_changes too.
+#
+# USAGE
+#   rollback_cmd mycommand --to-do-the-opossite-step
+#
+rollback_cmd () {
+
+  local l="$dir_rollback/latest.undo"
+  local target="$dir_rollback/${run_id}.undo"
+
+  cmd mkdir -p "$target"
+
+  if [ -L "$l" ]; then
+
+    local current="$( cmd readlink "$l" )"
+
+    if [ "X$current" != "X$target" ]; then
+      cmd ln -fns "$dir_rollback/${run_id}.undo" "$l"1
+    fi
+  else
+    cmd ln -s "$dir_rollback/${run_id}.undo" "$l"
+  fi
+
+  report "Saving rollback: $*"
+  if [ "$trial" -eq 1 ]; then
+    cmd printf '%s\n' "$*" \>\> "$target/steps"
+  else
+    printf '%s\n' "$*" >> "$target/steps"
+  fi
+}
+
+#
+# Rollback the last filesystem changeset
+#
+undo_last_files () {
+  for file in find "$dir_rollback/latest/"; do
+    echo found "$file"
+  done
+}
+
+#
+# Rollback (well, really print the code) the last commands changeset
+#
+undo_last_commands () {
+  if [ -e "$dir_rollback/latet.undo/steps" ]; then
+    cat "$dir_rollback/latet.undo/steps"
+  fi
+}
+
+#
+# Generic rollback invocation
+#
+# Important: The filesystem is restored first, and the commands run after.
+#
+undo_last_changes () {
+  undo_last_files
+  undo_last_commands
+}
+
+#  _________________________________________________________________
+# /\                                                                \
+# \/|                                                               |
+#   | File related functions                                        |
+#   |                                                               |
+#   |   ____________________________________________________________|
+#    \_/____________________________________________________________/
+#
+
+#
+# Sets given permissions on passed files or directories
+#
+# WARNING: argument order matters
+#
+# USAGE
+#   permissions /path/to/dir  root root 750
+#   permissions /path/to/file oper oper 644
+#
+permissions () {
+
+  local item="$1"
+  local item_c="${blue}${item}${normal}"
+  local item_owner="$2"
+  local item_group="$3"
+  local item_mode="$4"
+  local owner=''
+  local group=''
+  local mode=''
+
+  [ -r "$item" ] || die "Cannot read: $1"
+
+  #
+  # Obtain current values
+  #
+  read -r owner group mode <<EOF
+  $(
+    if [ -r "$item" ]; then
+      stat -c '%U %G %a' -- "$item"
+    else
+      if [ "$trial" != 0 ]; then
+        printf "%s " trial 666 trial 666 trial 000
+      fi
+    fi
+  )
+EOF
+
+  #
+  # Check ownership
+  #
+  if [ "${owner}:${group}" = "${item_owner}:${item_group}" ]; then
+    assert "Already the defined ownership: $item_owner:$item_group"
+  else
+    report "Saving rollback for permissions change on: $item"
+    rollback_cmd chown "$owner:$group" -- "$item"
+    report "Setting ownership for $item (wanted: $item_owner:$item_group, existing: $owner:$group)"
+    cmd chown "$item_owner:$item_group" -- "$item"
+  fi
+
+  #
+  # Check permissions
+  #
+  if [ "$mode" = "$item_mode" ]; then
+    assert "Already the defined mode: $item_mode"
+   else
+    report "Saving rollback for permissions change on: $item"
+    rollback_cmd chmod "$mode" -- "$item"
+    report "Setting up permissions for $item (wanted: $item_mode, existing: $mode)"
+    cmd chmod "$item_mode" -- "$item"
+  fi
+}
+
+#
+# directory - Ensures a directory
+#
+# USAGE
+#   directory -n /path/to/dir -o root -g root -m 700
+#   directory name /path/to/dir ensure absent
+#
+directory () {
+
+  local args="$*"
+  local error="Syntax error on: directory $args"
+  local dir_ensure='present'
+  local dir_group='root'
+  local dir_owner='root'
+  local dir_mode=400
+  local dir_name=''
+  local trigger=''
+  local trigger_run=0
+
+  #
+  # Parse our arguments
+  #
+  while [ $# -gt 0 ]; do
+    case $1 in
+      -e|--ensure|ensure)   dir_ensure=${2:?"$error"}  ;;
+      -g|--group|group)     dir_group=${2:?"$error"}   ;;
+      -o|--owner|owner)     dir_owner=${2:?"$error"}   ;;
+      -m|--mode|mode)       dir_mode=${2:?"$error"}    ;;
+      -n|--name|name)       dir_name=${2:?"$error"}    ;;
+      -t|--trigger|trigger) trigger=${2:?"$error"}     ;;
+      *) die "Syntax error, unknown argument to directory: $1" ;;
+    esac
+      shift 2
+  done
+
+  #
+  # We really NEED a directory name.
+  #
+  [ -n "$dir_name" ] || die "Syntax error, 'directory' needs a 'name' ($args)"
+  dir_name_c="${blue}${dir_name}${normal}"
+
+  #
+  # We may want it, to be absent or present
+  #
+  case $dir_ensure in
+    absent)
+      if [ -d "$dir_name" ]; then
+        report "Detected directory which should be absent: $dir_name_c"
+        rollback_path "$dir_name"
+        cmd rm -fr -- "$dir_name"
+        trigger_run=1
+      else
+        assert "Directory is absent: $dir_name_c"
+      fi
+      return
+    ;;
+    present)
+      if [ -d "$dir_name" ]; then
+        assert "Already present: $dir_name_c"
+      else
+        report "Detected directory which should be present: $dir_name_c"
+        rollback_cmd info "YOU SHOULD: rm rf -- '$dir_name'"
+        cmd mkdir -p "$dir_name"
+        trigger_run=1
+      fi
+    ;;
+    *)
+      die "Syntax error, unknown argument to 'ensure' in: directory $args"
+    ;;
+  esac
+
+  #
+  # Ensure the directory metadata if passed.
+  # FIXME permissions() arguments should be optional and no mandatory.
+  #
+  if [ -n "$dir_owner" ] && [ -n "$dir_group" ] && [ -n "$dir_mode" ]; then
+    permissions "$dir_name" "$dir_owner" "$dir_group" "$dir_mode"
+  fi
+
+  #
+  # Directory changes may have a trigger defined
+  #
+  if [ "$trigger_run" -eq 1 ]; then
+    if [ -n "$trigger" ]; then
+      trigger_c="${blue}$trigger${normal}"
+      report "Changes on $dir_name_c, triggers: $trigger_c"
+      cmd $trigger
+    fi
+  fi
+}
+
+#
+# Ensures a file from op files
+#
+# USAGE
+#  file -n /path/to/file -o root -g root -m 400 -t "echo trigger command"
+#  file -n /path/to/file -e absent
+#
+file () {
+
+  local args="$*"
+  local error="Syntax error on: file $args"
+  local file_ensure='present'
+  local file_group='root'
+  local file_owner='root'
+  local file_mode=400
+  local file_name=''
+  local file_trigger=''
+  local file_trigger_run=0
+
+  #
+  # Parse the arguments
+  #
+  while [ $# -gt 0 ]; do
+    case $1 in
+      -e|--ensure|ensure)   file_ensure=${2:?"$error"}  ;;
+      -g|--group|group)     file_group=${2:?"$error"}   ;;
+      -o|--owner|owner)     file_owner=${2:?"$error"}   ;;
+      -m|--mode|mode)       file_mode=${2:?"$error"}    ;;
+      -n|--name|name)       file_name=${2:?"$error"}    ;;
+      -t|--trigger|trigger) file_trigger=${2:?"$error"} ;;
+      *) die "$error" ;;
+    esac
+    shift 2
+  done
+
+  #
+  # We really NEED a file name
+  #
+  [ -n "$file_name" ] || die "Syntax error, 'file' needs a 'name', $args"
+  file_name_c="${blue}${file_name}${normal}"
+
+  #
+  # We may want this file to be absent or present
+  #
+  case $file_ensure in
+    absent)
+      if [ -f "$file_name" ]; then
+        report "Removing existing file, should be absent: $file_name_c"
+        cmd rm -f  -- "$file_name"
+      else
+        assert "Already absent: $file_name_c"
+      fi
+      return
+    ;;
+    present)
+      :
+    ;;
+    *)
+      die "Syntax error, unknown argument to 'ensure' in 'file', $args"
+    ;;
+  esac
+
+  #
+  # Update the target file content if it's different than the master file
+  #
+  if [ -e "$file_name" ]; then
+    if cmp -s "$file_name" "$files$file_name"; then
+      assert "Already present: $file_name_c"
+    else
+      report "File with differences: $file_name_c"
+      if [ "$trial" -eq 1 ]; then
+        diff -Nau -- "$file_name" "$files$file_name" || :
+      else
+        cmd diff -Nau -- "$file_name" "$files$file_name" || :
+      fi
+      rollback_path "$file_name"
+      report "Setting up: $file_name_c"
+      cmd cp -- "$files$file_name" "${file_name%/*}/"
+      file_trigger_run='1'
+    fi
+  else
+    report "Setting up new file: $file_name_c"
+    diff -Nau "$file_name" "$files$file_name" || :
+    rollback_cmd info "YOU SHOULD: rm -rf '${file_name%/*}'"
+    cmd mkdir -p -- "${file_name%/*}"
+    cmd cp -f -- "$files$file_name" "${file_name%/*}/"
+    file_trigger_run='1'
+  fi
+
+  #
+  # Ensure the directory metadata if passed
+  #
+  if [ -n "$file_owner" ] && [ -n "$file_group" ] && [ -n "$file_mode" ]; then
+    permissions "$file_name" "$file_owner" "$file_group" "$file_mode"
+  fi
+
+  #
+  # Also, file changes, may have a trigger defined
+  #
+  if [ "$file_trigger_run" -eq 1 ]; then
+    if [ -n "$file_trigger" ]; then
+      report "Changes on $file_name_c, triggers: $file_trigger"
+      cmd $file_trigger
+    fi
+  fi
+}
+
+#
+# FIXME check enbsubst from luisal
+#
+#tpl () {
+#  perl -pe '
+#    s;(\\*)(\$([a-zA-Z_][a-zA-Z_0-9]*)|\$\{([a-zA-Z_][a-zA-Z_0-9]*)\});
+#      substr($1,0,int(length($1)/2)).(length($1)%2?$2:$ENV{$3||$4});eg' "$1"
+#  >
+
+#  _________________________________________________________________
+# /\                                                                \
+# \/|                                                               |
+#   | Package management functions                                  |
+#   |                                                               |
+#   |   ____________________________________________________________|
+#    \_/____________________________________________________________/
+#
+
+#
+# pkg - ensure given (.deb) packages status
+#
+# Argument order matters, first the orders, last the packages.
+#
+# USAGE
+#   pkg present pkg1 pkg2
+#   pkg absent pkg1 pkg2
+#   pkg trigger audit-pkgs absent pkg1
+#
+pkg () {
+
+  local cmd=''
+  local pkg=''
+  local to_process=''
+  local trigger=''
+  local packages="$(
+    COLUMNS=200 dpkg -l | while read -r s p _; do
+      [ "$s" = 'ii' ] && printf ':%s:' "$p" || :
+    done
+  )"
+
+  #
+  # A package maybe defined as absent or present
+  #
+  case $1 in
+    -a|--absent|absent)   cmd=absent  ;;
+    -p|--present|present) cmd=present ;;
+    -t|--trigger|trigger)
+      file_trigger=${2:?"$error"};
+      file_trigger_c="${blue}$2${normal}"
+    ;;
+    *) error "Bad usage of pkg" ;;
+  esac
+  shift
+
+  #
+  # We may get more than one package as arguments
+  #
+  for pkg in "$@"; do
+  pkg_c="${blue}${pkg}${normal}"
+    case $packages in
+      *:"$pkg":*)
+        case $cmd in
+          present)
+            assert "Already installed: $pkg_c"
+          ;;
+          absent)
+            to_process="$to_process $pkg"
+            report "Selected to purge: $pkg_c"
+          ;;
+        esac
+      ;;
+      *)
+        case $cmd in
+          present)
+            to_process="$to_process $pkg"
+            report "Selected to install: $pkg_c"
+          ;;
+          absent)
+            assert "Already purged: $pkg_c"
+          ;;
+        esac
+      ;;
+    esac
+  done
+
+  #
+  # Perform package operations if needed
+  #
+  if [ -n "$to_process" ]; then
+    to_process="${to_process# }"
+    local cmd_c="${blue}$cmd${normal}"
+    local to_process_c="${blue}$to_process${normal}"
+    report "Ensuring $cmd_c for: $to_process_c"
+    case $cmd in
+      present)
+        rollback_cmd "apt-get remove --purge $to_process"
+        cmd apt-get -y install $to_process
+      ;;
+      absent)
+        rollback_cmd "apt-get install $to_process"
+        cmd apt-get remove --purge $to_process
+      ;;
+    esac
+    if [ -n "$trigger" ]; then
+      trigger_c="${blue}$trigger${normal}"
+      report "Changes on $to_process_c, triggers: $trigger_c"
+      cmd $trigger
+    fi
+  fi
+}
+
+#
+# aptkey - ensure an apt key
+#
+# FIXME needs review, works for my usage, rollback maybe broken
+#
+# USAGE
+#   aptkey present /path/to/filename.key  # ex: nginx_signing.key
+#   aptkey absent keyid                   # ex: 7BD9BF62
+#
+aptkey () {
+  case $1 in
+    -p|--present|present)
+      local file="$files$2"
+      local key_id="$(
+        gpg -v --dry-run --import -- "$file" 2>&1 | \
+          awk '/gpg: pub /{print $3}'
+      )"
+      if [ -z "$key_id" ]; then
+        error "Invalid key file: $file"
+        return
+      fi
+      if apt-key list | grep -q -- "$key_id"; then
+        assert "Already present: $key_id"
+      else
+        report "Importing not present key: $key_id"
+        rollback_cmd apt-key del "$file"
+        cmd apt-key add "$file"
+      fi
+    ;;
+    -a|--absent|absent)
+      local key_id=$1
+      if apt-key list | grep -q -- "$key_id"; then
+        report "Removing present key: $key_id (should be absent)"
+        rollback_cmd apt-key add "$key_id"
+        cmd apt-key del "$key_id"
+      else
+        assert "Already absent: $key_id"
+      fi
+    ;;
+    *) error "Unknown command to aptkey. Skipping: $*"; return ;;
+  esac
+}
+
+#  _________________________________________________________________
+# /\                                                                \
+# \/|                                                               |
+#   | Identity related functions (local users and groups)           |
+#   |                                                               |
+#   |   ____________________________________________________________|
+#    \_/____________________________________________________________/
+#
+
+#
+# group - ensure a group
+#
+# USAGE
+#   group name oper gid 2222 members oper
+#   group name oper ensure absent
+#
+group () {
+
+  local args="$*"
+  local error="Syntax error on: group $args"
+  local ensure='present';
+  local name='';
+  local gid='';
+  local members='';
+
+  #
+  # Parse the arguments
+  #
+  while [ $# -gt 0 ]; do
+    case $1 in
+      -e|--ensure|ensure)   ensure=${2:?"$error"}  ;;
+      -n|--name|name)       name=${2:?"$error"}    ;;
+      -g|--gid|gid)         gid=${2:?"$error"}     ;;
+      -m|--members|members) members=${2:?"$error"} ;;
+      *) die "Bad syntax to 'group': $*" ;;
+    esac
+    shift 2
+  done
+
+  #
+  # Our group requires a name
+  #
+  [ -n "$name" ] || die "'group' needs a 'name'. $error"
+
+  #
+  # And it maybe absent or present
+  #
+  case $ensure in
+    absent)
+      if getent group "$name" >/dev/null 2>&1; then
+        report "Removing existing group: $name (should be absent)"
+        rollback_cmd info "YOU SHOULD CREATE GROUP: $(getent group "$name")"
+        cmd groupdel -- "$name"
+      else
+        assert "Already absent: $name"
+      fi
+      return
+    ;;
+    present)
+      if getent group "$name" >/dev/null 2>&1; then
+        assert "Already present: $name"
+      else
+        report "Adding absent group: $name (should be present)"
+        cmd groupadd ${gid+"-g $gid"} -- "$name"
+        rollback_cmd info "YOU SHOULD DELETE GROUP: $(getent group "$name")"
+      fi
+
+      #
+      # Check group GID if passed
+      #
+      local gr=''
+      local p=''
+      local gi=''
+      local users=''
+      IFS=: read -r gr p gi users <<EOF
+    $( getent group "$name" )
+EOF
+
+      if [ -n "$gid" ]; then
+        if [ "$gi" -eq "$gid" ]; then
+          assert "Already the defined GID: $gid"
+        else
+          report "Fixing the GID for group: $name (wanted: $gid, existing: $gi)"
+          rollback_cmd groupmod -g $gi -- "$name"
+          cmd groupmod -g "$gid" -- "$name"
+        fi
+      fi
+
+      #
+      # Check group users
+      #
+      local u
+      echo "$users" | tr ',' '\n' | while read -r u; do
+        [ -n "$u" ] || continue
+        if getent group | grep "$u" | grep -q "$name"; then
+          assert "Already in group $name for user $u"
+        else
+          report "Setting group $name for user $u"
+          rollback_cmd gpasswd -d $u -- "$name"
+          cmd usermod -a -G "$name" -- "$u"
+        fi
+      done
+    ;;
+    *) die "$error"
+  esac
+}
+
+#
+# user - ensure the given user configuration
+#
+# TO-DO Rreview and add more options.
+#
+# USAGE
+#   user name oper groups oper,wheel pass 'PLAINTEXT'
+#   user name oper ensure absent
+#
+user () {
+
+  local args="$*"
+  local error="Syntax error on: user $args"
+  local ensure='present';
+  local description='';
+  local login='';
+  local groups='';
+  local pass='';
+  local home='';
+
+  while [ $# -gt 0 ]; do
+    case $1 in
+      -d|--description|description) description=${2:?"$error"} ;;
+      -e|--ensure|ensure)           ensure=${2:?"$error"}      ;;
+      -g|--groups|groups)           groups=${2:?"$error"}      ;;
+      -h|--home|home)               home=${2:?"$error"}        ;;
+      -l|--login|login)             login=${2:?"$error"}       ;;
+      -p|--login|pass)              pass=${2:?"$error"}        ;;
+      *) die "$error" ;;
+    esac
+    shift 2
+  done
+
+  [ -n "$login" ] || die "'user' needs a 'login'. $error"
+  [ -n "$pass" ] ||  die "'user' needs a 'pass'. $error"
+
+  case $ensure in
+    absent)
+      if getent passwd "$login" >/dev/null 2>&1; then
+        rollback_cmd info "YOUR SHOULD CREATE: $(getent passwd "$login")"
+        report "Removing existing user: $login (should be absent)"
+        cmd userdel -- "$login"
+      else
+        assert "Already absent: $login"
+        [[ "$home" ]] && [[ -d "$home" ]] && info "Still exists: $home"
+      fi
+      return
+    ;;
+    present)
+      if getent passwd "$login" >/dev/null 2>&1; then
+        assert "Already present: $login"
+      else
+        report "Adding absent user: $login (should be present)"
+        local opts=''
+        [ -n "$groups" ] && opts="$opts -g $groups"
+        [ -n "$home" ] && opts="$opts -d $home"
+        cmd useradd $opts -- "$login"
+        rollback_cmd info "YOUR SHOULD DELETE: $(getent passwd "$login")"
+      fi
+
+      IFS=: read -r gr p gi users <<EOF
+    $( getent passwd "$login" )
+EOF
+    ;;
+    *) die "$error" ;;
+  esac
+}
+
+#  _________________________________________________________________
+# /\                                                                \
+# \/|                                                               |
+#   | nagios/opsview check helpers.                                 |
+#   |                                                               |
+#   |   ____________________________________________________________|
+#    \_/____________________________________________________________/
+#
+
+ok () {       echo "OK- $*";       exit 0; }
+warn () {     echo "WARNING- $*";  exit 1; }
+critical () { echo "CRITICAL- $*"; exit 2; }
+unknown () {  echo "UNKNOWN- $*";  exit 3; }
+
+#  _________________________________________________________________
+# /\                                                                \
+# \/|                                                               |
+#   | Argument parsing and initialization steps. Here be dragons.   |
+#   |                                                               |
+#   |   ____________________________________________________________|
+#    \_/____________________________________________________________/
+#
+
+while [ $# -gt 0 ]; do
+  case $1 in
+    -o|--op|op)
+      case $* in
+        (*'list'*|*'-l'*|*'--list'*)
+          for i in ./ops/*; do
+            printf '%s\n' "${i##./ops/}"
+          done
+          return
+        ;;
+        *)
+          :
+        ;;
+      esac
+      if [ "$#" -ge 2 ]; then
+        if [ -e "./ops/$2" ]; then
+          op_default="./ops/$2"
+          shift 2
+        else
+          error "Unknown operation type: $2"
+          error "List of known operations:"
+          for i in ./ops/*; do
+            printf '%s\n' "${i##./ops/}"
+          done
+          printf '%s' "$op_help" >&2
+          exit 1
+        fi
+      else
+        printf '%s' "$op_help" >&2
+        exit 1
+      fi
+    ;;
+    -r|--request|request)
+      case $* in
+        (*'list'*|*'-l'*|*'--list'*)
+          for i in ./requests/*; do
+            printf '%s\n' "${i##./requests/}"
+          done
+          return
+        ;;
+        *) : ;;
+      esac
+      if [ "$#" -ge 2 ]; then
+        if [ -e "./requests/$2" ]; then
+          op_default="./requests/$2"
+          shift 2
+          request_args="$*"
+          shift "$#"
+        else
+          error "Unknown request type: $2"
+          error "List of known requests:"
+          for i in ./requests/*; do
+            printf '%s\n' "${i##./requests/}"
+          done
+          printf '%s' "$op_help" >&2
+          exit 1
+        fi
+      else
+        printf '%s' "$op_help" >&2
+        exit 1
+      fi
+    ;;
+    -n|--nocolor|nocolor)
+      nocolor=1
+      normal=''
+      red=''
+      green=''
+      yellow=''
+      blue=''
+      magenta=''
+      shift 1
+    ;;
+    -t|--trial|trial)
+      trial=1
+      shift 1
+    ;;
+    -u|--undo|undo)
+      undo_last_changes
+      exit
+    ;;
+    -v|--verbose|verbose)
+      verbose=1
+      shift 1
+    ;;
+    -h|--help|help)
+      printf '%s' "$op_help"
+      exit
+    ;;
+    *)
+      printf '%s' "$op_help" >&2
+      exit 1 
+    ;;
+  esac
+done
+
+[ -d "$work_dir/ops" ] || die "You need to define some operations first."
+
+mkdir -p "$work_dir/logs"
+
+#
+# Block parallel runs from ourself
+#
+if mkdir -p "${lock%/*}" && mkdir "$lock"; then
+  trap 'notify_run; [ -r "$lock" ] && rm -rf "$lock"; exit' EXIT
+  echo "$$" > "$lock/PID"
+else
+  error "Other instance is running, or there is a staled lock. Exiting."
+  if [ -e $lock/PID ]; then
+    bad_pid="$( cat $lock/PID )"
+    error "Save this information for report:
+$( stat $lock )
+PID: ${badpid:-'UNKNOWN'}
+"
+  fi
+  die "Exiting"
+fi
+
+#
+# If still didn't exit, we're going to launch operations.
+# Initialize the log.
+#
+mkdir -p "${log_file%/*}"
+ln -sf "$log_file" "$work_dir/logs/latest"
+
+#
+# If no operation is given run them all.
+#
+if [ -z "${op_default:-}" ]; then
+  if dir_is_empty "$work_dir/ops"; then
+    die "You need to define some operations to run."
+  else
+    # syntax check all operations
+    for operation in "$work_dir/ops/"*; do sh -n "$operation" || exit; done
+    # and run them all
+    for operation in "$work_dir/ops/"*; do . "$operation"; done
+    exit
+  fi
+# Or if some specific operation is given, run only that one.
+elif [ -e "$op_default" ]; then
+  if sh -n -- "$op_default"; then
+    if . "$op_default"; then
+      [ "$verbose" -eq 1 ] || printf "Finished %s\n" "${green}OK${normal}"
+    else
+      die "exit with code: ${red}${?}${normal}"
+    fi
+  else
+    die "invalid syntax in: ${red}${op_default}${normal}"
+  fi
+else
+  die "could not read file: ${red}${op_default}${normal}"
+fi
+
