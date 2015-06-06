@@ -1107,9 +1107,14 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ -d "$work_dir/ops" ] || die "You need to define some operations first."
+#
+# If still didn't exit, we're going to launch operations.
+# Initialize the log.
+#
+mkdir -p "${log_file%/*}"
+ln -sf "$log_file" "$work_dir/logs/latest"
 
-mkdir -p "$work_dir/logs"
+[ -d "$work_dir/ops" ] || die "You need to define some operations first."
 
 #
 # Block parallel runs from ourself
@@ -1128,13 +1133,6 @@ PID: ${badpid:-'UNKNOWN'}
   fi
   die "Exiting"
 fi
-
-#
-# If still didn't exit, we're going to launch operations.
-# Initialize the log.
-#
-mkdir -p "${log_file%/*}"
-ln -sf "$log_file" "$work_dir/logs/latest"
 
 #
 # If no operation is given run them all.
