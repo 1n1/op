@@ -40,7 +40,7 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-version=0.0.2
+version=0.1
 
 # Reflect renames of our own name, on messages, etc)
 op=${0##*/}
@@ -190,7 +190,7 @@ log () {
   local blue=""
   local magenta=""
   local msg="$(echo "$*" |sed -r 's/\x1b\[[0-9;]*m?//g')"
-  printf -- '[%s] [%s] %s\n' "$(now)" "$USER${SUDO_USER:+"/$SUDO_USER"}" "$msg" >> "$log_file";
+  printf -- '[%s] [%s] %s\n' "$(now)" "${USER:+$USER}${SUDO_USER:+"/$SUDO_USER"}" "$msg" >> "$log_file";
 }
 
 assert () {
@@ -877,7 +877,9 @@ group () {
         assert "Already present: $name"
       else
         report "Adding absent group: $name (should be present)"
-        cmd groupadd ${gid+"-g $gid"} -- "$name"
+        local g=''
+        [ -n "${gid## }" ] && g="$g -g $gid"
+        cmd groupadd $g -- "$name"
         rollback_cmd info "YOU SHOULD DELETE GROUP: $(getent group "$name")"
       fi
 
@@ -975,7 +977,7 @@ user () {
       else
         report "Adding absent user: $login (should be present)"
         local opts=''
-        [ -n "$groups" ] && opts="$opts -g $groups"
+        [ -n "$groups" ] && opts="$opts -g $(echo $groups | sed 's/,/ -g /g')"
         [ -n "$home" ] && opts="$opts -d $home"
         cmd useradd $opts -- "$login"
         rollback_cmd info "YOUR SHOULD DELETE: $(getent passwd "$login")"
