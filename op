@@ -441,7 +441,7 @@ EOF
   # Check ownership
   #
   if [ "${owner}:${group}" = "${item_owner}:${item_group}" ]; then
-    assert "Already the defined ownership: $item_owner:$item_group"
+    assert "Already the defined ownership: ${blue}$item_owner:$item_group${normal}"
   else
     report "Saving rollback for permissions change on: $item"
     rollback_cmd chown "$owner:$group" -- "$item"
@@ -453,7 +453,7 @@ EOF
   # Check permissions
   #
   if [ "$mode" = "$item_mode" ]; then
-    assert "Already the defined mode: $item_mode"
+    assert "Already the defined mode: ${blue}$item_mode${normal}"
    else
     report "Saving rollback for permissions change on: $item"
     rollback_cmd chmod "$mode" -- "$item"
@@ -1036,9 +1036,8 @@ while [ $# -gt 0 ]; do
           error "Unknown operation type: $2"
           error "List of known operations:"
           for i in ./ops/*; do
-            printf '%s\n' "${i##./ops/}"
+            printf ' %s\n' "${i##./ops/}" >&2
           done
-          printf '%s' "$op_help" >&2
           exit 1
         fi
       else
