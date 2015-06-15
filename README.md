@@ -17,7 +17,7 @@ We need to work on a proper installer.
 
 By now you can run:
 
-    wget -O op.tar.gz https://inigo.me/pub/op/op.v1.0.tar.gz
+    wget -O op.tar.gz https://inigo.me/pub/op/op-0.1.tar.gz
     tar -zxf op.tar.gz
     cd op
 
