@@ -1,5 +1,5 @@
 
-Welcome contributor :-)
+Welcome.
 
 We're on development stage, for the good and for the bad.
 
