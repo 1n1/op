@@ -41,6 +41,9 @@ by date, on ```./logs/```
 
 You will find rollback files and steps, for each run, under ```./rolback/```
 
+Of course you can tune all the previous layout (for example log to /var/log and
+install logrotate definitions) using variables at the beginning of ```op```.
+
 ## Usage
 
 Be carefull, op without arguments runs all the defined *ops*.
@@ -51,7 +54,6 @@ You can call it as many times as you want, it should return OK.
 
 To refresh your memory about ```op``` options, you can call ```./op -h```
 
-  $ sudo ./op -h
   
     op v0.0.2  <https://inigo.me/projects/op>
   
@@ -74,7 +76,6 @@ To refresh your memory about ```op``` options, you can call ```./op -h```
       op undo
       op -v --request typeA param1 param2 ...
   
-  $
 
 Parametrized requests pass the parameters at the end of the CLI invocation.
 
@@ -87,37 +88,37 @@ For any other options and combinations, the order does not matter at all.
 Lets say you work on a very big or very changing IT team. And you connect to
 a server. You can discover what system definitions are there:
 
-  ./op --op --list
+    ./op --op --list
 
 As well as, what kind of customer requests are defined in the system:
 
-  ./op --request --list
+    ./op --request --list
 
 ### Workflow of a system setting change
 
 You edit inside (copy them, if needed) ./files/ the files that you want to
 modify. For example:
 
-  cp -a /etc/fstab files/etc/fstab
-  vim files/etc/fstab    # do your changes there and save...
+    cp -a /etc/fstab files/etc/fstab
+    vim files/etc/fstab    # do your changes there and save...
 
 Next, you include the file from some existing operation definition, or from a
 new one:
 
-  vim ops/base
+    vim ops/base
 
 You could use the op function: ```file```, to ease logging, repeatability
 and rollbacks:
 
-  echo 'file -n /etc/fstab -o root -g root -m 644' >> ops/base
+    echo 'file -n /etc/fstab -o root -g root -m 644' >> ops/base
 
 Then you can test your changes before apply them:
 
-  ./op op base -v --trial
+    ./op op base -v --trial
 
 If everything looks ok, go ahead:
 
-  ./op op base
+    ./op op base
 
 ### Workflow of a parametrized request
 
