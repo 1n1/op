@@ -165,7 +165,7 @@ you need to do with the information in the log, or to trigger your own commands.
 
 ## Examples
 
-You can browse (https://inigo.me/git/op-examples.git)[the op examples] to get
+You can browse [the op-examples](https://github/1n1/op-examples) to get
 a feeling on howto use this tool.
 
 You can take a look for example ops, and example requests there, and of course,
