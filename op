@@ -5,7 +5,7 @@
 # \/|                                                               |
 #   | op - Support tool and micro Config Management System          |
 #   |                                                               |
-#   | Operational definitions pure /bin/sh                          |
+#   | Operational definitions in pure /bin/sh                       |
 #   |                                                               |
 #   |   ____________________________________________________________|
 #    \_/____________________________________________________________/
@@ -148,7 +148,8 @@ EOF
 
 # help message
 op_help="
-  $op ${blue}v$version $normal <https://inigo.me/projects/$op>
+  $op ${blue}v$version $normal <https://inigo.me>
+
 
   ${green}USAGE:$normal
     $op COMMAND [ARGUMENTS]
@@ -285,7 +286,7 @@ dir_is_empty () {
 #  _________________________________________________________________
 # /\                                                                \
 # \/|                                                               |
-#   | Rolling back commands                                         |
+#   | Rolling-back commands                                         |
 #   |                                                               |
 #   |   ____________________________________________________________|
 #    \_/____________________________________________________________/
