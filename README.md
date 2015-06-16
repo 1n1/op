@@ -154,13 +154,14 @@ examples below.
 ## Change and error notifications
 
 If you want to do something with the log, each time there are changes, you
-should enable notifications in the configuration file (```./op/op.conf```)
+should enable notifications in the ```op``` variables.
 
 The default action, is to send the log and some system info, to the defined
-email addresses. Notifications are disabled by default.
+email addresses. But notifications are disabled by default. You should edit the
+mail addresses and enable tnotifications.
 
 Nothing stops you to modify the ```notify_run``` function, to do whatever
-you need to do with the information.
+you need to do with the information in the log, or to trigger your own commands.
 
 ## Examples
 
