@@ -45,26 +45,28 @@ You can call it as many times as you want, it should return OK (hint: use
 
 To refresh your memory about ```op``` options, you can call ```./op -h```
 
-    op v0.2  <https://inigo.me>
+      op v0.2  <https://inigo.me>
     
-    USAGE:
-      op COMMAND [ARGUMENTS]
     
-    COMMANDS:
-      op OP  ..... Run only OP. By default all ops run. See 'op list'.
-      request .... Runs a parametrized request. See 'request list'
-      trial ...... Trial (do not apply any change, only show actions, combined)
-      undo ... Runs the undo steps, and restores the latest modified ops
-      help ....... Show this help message, and exit
+      USAGE:
+        op COMMAND [ARGUMENTS]
     
-      Sort format (-o) or long format (--op) as well as words (op) are valid.
+      COMMANDS:
+        op OP  ..... Run only OP. By default all ops run. See 'op list'.
+        request .... Runs a parametrized request. See 'request list'
+        trial ...... Trial (do not apply any change, only show actions, combined)
+        undo ... Runs the undo steps, and restores the latest modified ops
+        doc ........ Show detailed documentation, and exit.
+        help ....... Show this help message, and exit
     
-    EXAMPLES
-      op
-      op op stack trial
-      op op stack
-      op undo
-      op -v --request typeA param1 param2 ...
+        Sort format (-o) or long format (--op) as well as words (op) are valid.
+    
+      EXAMPLES
+        op
+        op op stack trial
+        op -o stack
+        op undo
+        op -v --request typeA param1 param2 ...
 
 
 Parametrized requests pass the parameters at the end of the CLI invocation.
