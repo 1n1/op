@@ -153,14 +153,5 @@ mail addresses and enable tnotifications.
 Nothing stops you to modify the ```notify_run``` function, to do whatever
 you need to do with the information in the log, or to trigger your own commands.
 
-## Examples
-
-You can browse [the op-examples](https://github.com/1n1/op-examples) to get
-a feeling on howto use this tool.
-
-You can take a look for example ops, and example requests there, and of course,
-reuse them as dessired.
-
-
 Happy operations!
 
