@@ -96,6 +96,9 @@ called on a repeatable, auditable and easy to remember or discover way.
 
 ## Examples
 
+You can continue reading the [WORKFLOW](./WORKFLOW.md) to get more instructions,
+and the [MANUAL](MANUAL.md) while writing your own recipes.
+
 You can browse [the op-examples](https://github.com/1n1/op-examples) to get
 a feeling on howto use this tool.
 
