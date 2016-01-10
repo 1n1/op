@@ -219,8 +219,7 @@ They will be available under ```./rollback/latest/```:
     12 directories, 6 files
     root@shell:~/op # 
 
-If there are commands logged as rollback, they will be writen in
-```./rollback.undo/latest```.
+If there are commands logged as rollback, they will be writen in ```./rollback.undo/latest```.
 
 ## Why this software?
 
