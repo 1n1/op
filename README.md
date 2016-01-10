@@ -142,40 +142,40 @@ execute them.
 
 So typically you wil work with a tree like this:
 
-root@shell:~/op # tree
-.
-├── files
-│   └── root
-├── op
-├── ops
-│   └── root
-└── requests
-    └── reboot
-
-4 directories, 3 files
-root@shell:~/op # 
+    root@shell:~/op # tree
+    .
+    ├── files
+    │   └── root
+    ├── op
+    ├── ops
+    │   └── root
+    └── requests
+        └── reboot
+    
+    4 directories, 3 files
+    root@shell:~/op # 
 
 When ```op```runs, a new log is created, you can access througt ```./logs/latest```:
 
-root@shell:~/op # ./op
-root@shell:~/op # tree
-.
-├── files
-│   └── root
-├── logs
-│   ├── 2016
-│   │   └── 01
-│   │       └── 10
-│   │           └── 18-15-05.031234472.log
-│   └── latest -> /root/op/logs/2016/01/10/18-15-05.031234472.log
-├── op
-├── ops
-│   └── root
-└── requests
-    └── reboot
-
-8 directories, 5 files
-root@shell:~/op # 
+    root@shell:~/op # ./op
+    root@shell:~/op # tree
+    .
+    ├── files
+    │   └── root
+    ├── logs
+    │   ├── 2016
+    │   │   └── 01
+    │   │       └── 10
+    │   │           └── 18-15-05.031234472.log
+    │   └── latest -> /root/op/logs/2016/01/10/18-15-05.031234472.log
+    ├── op
+    ├── ops
+    │   └── root
+    └── requests
+        └── reboot
+    
+    8 directories, 5 files
+    root@shell:~/op # 
 
 Also, when there are changes, rollback files are created:
 
