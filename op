@@ -3,8 +3,9 @@
 ##
 ## op - the operations tool.
 ##
-## This program aims to ease systems definition and maintenance in /bin/sh
+## This program, aims to ease systems definition and maintenance, in /bin/sh
 ##
+
 ## +---------+
 ## | License |
 ## +---------+
@@ -24,6 +25,7 @@
 ## WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ## ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 ## OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
 ##
 ## +------------------------------+
 ## | Initialization and variables |
@@ -59,7 +61,7 @@ fi
 ## reuse in your recipes.
 ##
 ## * version: The program version.
-version=0.2
+version=0.3
 
 ## * op: contains the executable name, used on messages, etc.
 op=${0##*/}
@@ -165,60 +167,16 @@ notify_enabled=0
 # We start counting, like if there were no changes or errors...
 notify=0
 
+## HTTP notifications are configured using:
 ##
-## Mail notifications are configured using:
+## http_url: URL to use for the request
+## http_headers: Extra headers in curl format
+## http_options: All of the previous together
 ##
-## * mail_to: main recipient
-## * mail_cc: addresses with a copy
-##
-## The notify_tpl() funtion, emits the mail body sent.
-##
-## Edit all of them to your needs if you enable notifications.
-##
-mail_to="support@example.com"
-mail_cc="changes@example.com"
-
-# Template used for notifications if they are enabled
-notify_tpl () {
-  cat <<EOF
-Here are attached the changes for this transaction:
-
- op: $op
- run: $run_id
- by $USER${SUDO_USER:+"/$SUDO_USER"}"
-
-Below is the system state, at notification time:
-
-SSH PROCESSES ($$):
-$( ps auxwww | grep -E "(sshd:|$$)" )
-
-W:
-$( w )
-
-WHO:
-$( who -a )
-
-CONNECTIONS:
-$( netstat -platun | grep ssh)
-
-SYSTEM
-$(uptime)
-
-MEMORY
-$(free -m)
-
-FILESYSTEMS
-$(df -Ph | column -t)
-
-FULL PROCESS LIST
-$( ps afuxwww)
-
-
-Yours carefully, the $op tool
-v$version
-
-EOF
-}
+## Use http_options to tune any extra curl option you may need
+http_url="https://127.0.0.1/report"
+http_headers="-H 'OP: $version' -H 'RunId: $run_id' -H 'Client: $hostname'"
+http_options="-s $http_headers $http_url"
 
 ##
 ## +--------------------------------------------------+
@@ -378,13 +336,11 @@ dir_is_empty () {
 ##   notify
 ##
 notify () {
-  if [ "$notify_enabled" = 1 ]; then
-    notify=1
-  fi
+  [ "$notify_enabled" = 1 ] && notify=1 || notify=0
 }
 
 ##
-## FUNCTION notify_run - function to run notifications on EXIT trap
+## FUNCTION notify_run - function to trigger notifications on EXIT trap
 ##
 ## No arguments required.
 ##
@@ -392,26 +348,14 @@ notify () {
 ##   notify_run
 ##
 notify_run () {
-
   if [ "$notify_enabled" = 1 ] && [ "$notify" = 1 ]; then
+    info "Running notification"
     if [ -e "$log_file" ]; then
-      local subject="[$op] [$hostname] $run_id"
-      if [ "$trial" = 1 ]; then
-        cat <<EOF
-From: $op
-To: $notify_to
-Subject: $subject
-Attachment: $log_file
-
-$(notify_tpl)
-EOF
+      if response="$( curl -X POST -d @$log_file $http_options )"; then
+        info "Reponse received..."
+        printf '%s\n' "$response" | while read -r line; do info "$line"; done
       else
-        if [ -n "$mail_cc" ]; then
-          mail_dst="$mail_to -c $mail_cc"
-        else
-          mail_dst="$mail_to"
-        fi
-        echo "$(notify_tpl)" | mail -a "$log_file" -s "$subject" "$mail_dst"
+        error "Could not notify, Curl error code: $?"
       fi
     else
       error "Could not notify, unreadable: $log_file"
@@ -490,7 +434,7 @@ rollback_cmd () {
   fi
 
   report "Saving rollback: $*"
-  if [ "$trial" -eq 1 ]; then
+  if [ "$trial" = 1 ]; then
     cmd printf '%s\n' "$*" \>\> "$target/steps"
   else
     printf '%s\n' "$*" >> "$target/steps"
@@ -692,7 +636,7 @@ directory () {
   #
   # Directory changes may have a trigger defined
   #
-  if [ "$trigger_run" -eq 1 ]; then
+  if [ "$trigger_run" = 1 ]; then
     if [ -n "$trigger" ]; then
       trigger_c="${blue}$trigger${normal}"
       report "Changes on $dir_name_c, triggers: $trigger_c"
@@ -797,7 +741,7 @@ file () {
   #
   # Also, file changes, may have a trigger defined
   #
-  if [ "$file_trigger_run" -eq 1 ]; then
+  if [ "$file_trigger_run" = 1 ]; then
     if [ -n "$file_trigger" ]; then
       report "Changes on $file_name_c, triggers: $file_trigger"
       cmd $file_trigger
@@ -1026,7 +970,7 @@ group () {
 EOF
 
       if [ -n "$gid" ]; then
-        if [ "$gi" -eq "$gid" ]; then
+        if [ "$gi" = "$gid" ]; then
           assert "Already the defined GID: $gid"
         else
           report "Fixing the GID for group: $name (wanted: $gid, existing: $gi)"
@@ -1254,15 +1198,23 @@ if mkdir -p "${lock%/*}" && mkdir "$lock"; then
   trap 'notify_run; [ -r "$lock" ] && rm -rf "$lock"; exit' EXIT
   echo "$$" > "$lock/PID"
 else
-  error "Other instance is running, or there is a staled lock. Exiting."
   if [ -e $lock/PID ]; then
-    bad_pid="$( cat $lock/PID )"
-    error "Save this information for report:
+    bad_pid="$( cat "$lock/PID" )"
+    if kill -0 $bad_pid 2>/dev/null; then
+      error "Other instance is running, or there is a staled lock. Exiting."
+      error "Save this information for report:
 $( stat $lock )
-PID: ${badpid:-'UNKNOWN'}
+PID: ${bad_pid:-'UNKNOWN'}
+$(ps auxfwww | grep "$bad_pid")
 "
+    else
+      echo >&2 "Removing stalled lock and re-executing"
+      rm -rf "$lock"
+      ./$op "$@"
+      exit
+    fi
   fi
-  die "Exiting"
+  die "Could not lock. Exiting."
 fi
 
 #
@@ -1272,19 +1224,19 @@ if [ -z "${op_default:-}" ]; then
   if dir_is_empty "$work_dir/ops"; then
     die "You need to define some operations to run."
   else
-    # syntax check all operations
-    for operation in "$work_dir/ops/"*; do sh -n "$operation" || exit; done
-    # and run them all
-    for operation in "$work_dir/ops/"*; do . "$operation"; done
+    # syntax check all operation files
+    for f in "$work_dir/ops/"*; do sh -n "$f" || exit; done
+    # and source them all
+    for f in "$work_dir/ops/"*; do . "$f"; done
     exit
   fi
 # Or if some specific operation is given, run only that one.
 elif [ -e "$op_default" ]; then
   if sh -n -- "$op_default"; then
     if . "$op_default"; then
-      printf "Finished %s\n" "${green}OK${normal}"
+      assert "Finished ${green}OK${normal}: $op_default"
     else
-      die "exit with code: ${red}${?}${normal}"
+      die "exit with code: ${red}${?}${normal} $op_default"
     fi
   else
     die "invalid syntax in: ${red}${op_default}${normal}"

@@ -39,6 +39,8 @@ Or let's say you need to create systems, to transfer to operations.
 Then, if you reflect on any of the previous scenarios, this wraper may become
 helpful for you.
 
+## How-to use this software?
+
 You connect to a new system (lets say, srv1539) and you want to discover what
 it does because you did get an alert:
 
@@ -51,8 +53,9 @@ If you get a response, and you want to know each item of the list in detail,
 just check the file on ```./ops/filename```, they should be easy primitives
 to understand. This is /bin/sh with a few core functions.
 
-Here you can see one, as an example:
-
+Here you can see one, as an example, of course you're free to put vanilla
+shell code (/bin/sh) there too, but those functions, make the steps and
+the changes repeatable:
 
     info "Starting the nginx setup"
     
@@ -78,26 +81,27 @@ From there, we can say that the master files, used in that operation, are:
     /root/op/files/etc/nginx/nginx_signing.key
 
 5 minutes latter, you get a request of "do_whatever_buz" with parameters "foo"
-and "bar" on another server (lets say, customer57os26srv34)... what a mess... easy:
+and "bar" on another server (lets say, customer57os26srv34)... what a mess...
+easy:
 
     cd /root/op
     ./op --request do_whatever_buz foo bar
 
-All op invocations (except the help) are logged, including command output, file diffs,
-user/sudo-user calling the program, etc...
+All op invocations (except the help) are logged, including command output,
+file diffs, user/sudo-user calling the program, etc...
 
-Optionally, if you setup an MTA in the host where ```op``` is called, you
-can send output of changes and errors by mail.
+Optionally, you can send notifications of changes, errors, or even normal
+runs, and the log file by HTTP.
 
 This script is just a convention to call to other custom scripts, the same you
-maybe calling to Ansible, or Puppet, or a Nagios check, or a complex SQL, on those
-custom scripts, below the shell umbrella. The purposse is to simply have them
-called on a repeatable, auditable and easy to remember or discover way.
+maybe calling to Ansible, or Puppet, or a Nagios check, or a complex SQL, on
+those custom scripts, below the shell umbrella. The purposse is to simply have
+them called on a repeatable, auditable and easy to remember or discover way.
 
 ## Examples
 
-You can continue reading the [WORKFLOW](./WORKFLOW.md) to get more instructions,
-and the [MANUAL](MANUAL.md) while writing your own recipes.
+You can continue reading the [WORKFLOW](./WORKFLOW.md) to get more
+instructions, and the [MANUAL](MANUAL.md) while writing your own recipes.
 
 You can browse [the op-examples](https://github.com/1n1/op-examples) to get
 a feeling on howto use this tool.

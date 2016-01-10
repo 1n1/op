@@ -45,8 +45,7 @@ You can call it as many times as you want, it should return OK (hint: use
 
 To refresh your memory about ```op``` options, you can call ```./op -h```
 
-      op v0.2  <https://inigo.me>
-    
+      op v0.3  <https://inigo.me>
     
       USAGE:
         op COMMAND [ARGUMENTS]
@@ -67,7 +66,6 @@ To refresh your memory about ```op``` options, you can call ```./op -h```
         op -o stack
         op undo
         op -v --request typeA param1 param2 ...
-
 
 Parametrized requests pass the parameters at the end of the CLI invocation.
 
