@@ -19,8 +19,34 @@ sourced primitives stored under ```./ops/*```.
 
 Parametrized system change requests, go under ```./requests/*```.
 
+Files to be controlled or distributed, go under ```./files/*```.
+
 You can list available support operations and requests, and of course,
 execute them.
+
+So typically you wil work with a tree like this:
+
+        .
+        ├── files
+        │   └── etc
+        │       └── apt
+        │           ├── apt.conf.d
+        │           │   └── 99local
+        │           ├── sources.list
+        │           └── sources.list.d
+        │               └── nginx.list
+        ├── ops
+        │   ├── backup
+        │   ├── base
+        │   ├── network
+        │   ├── root
+        │   ├── ssh
+        │   ├── stack
+        │   ├── stack-git
+        │   └── user-foo
+        └── requests
+            ├── backup
+            └── patching
 
 ## Why this software?
 
@@ -101,7 +127,7 @@ them called on a repeatable, auditable and easy to remember or discover way.
 ## Examples
 
 You can continue reading the [WORKFLOW](./WORKFLOW.md) to get more
-instructions, and the [MANUAL](MANUAL.md) while writing your own recipes.
+instructions, and the [MANUAL](MANUAL.txt) while writing your own recipes.
 
 You can browse [the op-examples](https://github.com/1n1/op-examples) to get
 a feeling on howto use this tool.
