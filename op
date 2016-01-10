@@ -3,6 +3,12 @@
 ##
 ## op - the operations tool.
 ##
+## This program aims to ease systems definition and maintenance in /bin/sh
+##
+## +---------+
+## | License |
+## +---------+
+##
 ## Copyright (C) 2015, Iñigo Tejedor Arrondo <http://inigo.me/>
 ##
 ## All rights reserved.
@@ -1217,7 +1223,7 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
     -d|--doc|doc)
-      grep '^##' "$(readlink -f $0)"| sed 's/^##/    /' | ${PAGER:-less}
+      grep '^##' "$(readlink -f $0)"| sed 's/^##//' | sed 's/^ //' | ${PAGER:-less}
       exit
     ;;
     -h|--help|help)
@@ -1287,4 +1293,15 @@ else
   die "could not read file: ${red}${op_default}${normal}"
 fi
 
+##
+## +----------+
+## | See Also |
+## +----------+
+##
+## See the project page at: http://1n1.github.io/op/
+##
+## And the source repository at: https://github.com/1n1/op
+##
+## Happy operations!
+##
 
