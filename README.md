@@ -44,7 +44,7 @@ Let's create a modified file, for a custom system:
 And now, let's create a definition for this file:
 
      root@shell:~/op # mkdir ops
-     root@shell:~/op # echo file -n /root/bashrc -m 600 -o root -g root
+     root@shell:~/op # echo file -n /root/bashrc -m 600 -o root -g root > ops/root
 
 It should be there...
 
@@ -89,11 +89,11 @@ Days latter, we can modify our file:
     [DONE] Finished OK: ./ops/root
     root@shell:~/op #
 
-Woops, what did happen? well, a change was made, applied, detected, a rollback
+What did happen? well, a change was made, applied, detected, a rollback
 copy saved, a diff logged, and we did get to the *Desired State*.
 
-After the hange did apply, we can run op as many times as we want, to ensure
-that the *Desired State* is already there:
+After the change did apply, we can run ```op``` as many times as we want,
+to ensure that the *Desired State* is already there:
 
     root@shell:~/op # ./op
     root@shell:~/op # ./op -v
@@ -111,7 +111,7 @@ that the *Desired State* is already there:
     [DONE] Finished OK: ./ops/root
     root@shell:~/op # 
 
-So you did learn what "operations" are in the op context.
+So you did learn, what are *operation* files, in the ```op``` context.
 
 ## Parametrized requests
 
