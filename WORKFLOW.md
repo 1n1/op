@@ -55,7 +55,7 @@ To refresh your memory about ```op``` options, you can call ```./op -h```
         op OP  ..... Run only OP. By default all ops run. See 'op list'.
         request .... Runs a parametrized request. See 'request list'
         trial ...... Trial (do not apply any change, only show actions, combined)
-        undo ... Runs the undo steps, and restores the latest modified ops
+        undo ....... Runs the undo steps, and restores the latest modified ops
         doc ........ Show detailed documentation, and exit.
         help ....... Show this help message, and exit
     
