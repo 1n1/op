@@ -1,100 +1,87 @@
 #!/bin/sh
 
-##
-## op - the operations tool.
-##
-## This program, aims to ease systems definition and maintenance, in /bin/sh
-##
-
-## +---------+
-## | License |
-## +---------+
-##
-## Copyright (C) 2015, Iñigo Tejedor Arrondo <http://inigo.me/>
-##
-## All rights reserved.
-##
-## Permission to use, copy, modify, and/or distribute this software for any
-## purpose with or without fee is hereby granted, provided that the above
-## copyright notice and this permission notice appear in all copies.
-##
-## THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-## WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-## MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-## ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-## WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-## ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-## OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-##
-## +------------------------------+
-## | Initialization and variables |
-## +------------------------------+
-##
-## When you call 'op' without arguments, it sources all operations stored in
-## a relative subdirectory from the invocation dir, under ./ops/*
-##
-## Those sourced operations, can reuse this program variables and functions.
-##
-## There are switches to call specific ./ops/ files (-o) and specific requests
-## under ./requests/ (-r). We will reference those custom files as "recipes"
-## from now on.
-##
-## The modes -e and -u, are set at initialization, recipes will be affected
-## by such behavior.
-##
-## By default we're quiet, with the program output. Use -v to see verbose
-## messages.
-##
-## Use --trial on the command line, for test without applying commands.
-##
+#doc#1 Introduction to op
+#
+# op - The opertions tool
+#
+# This program, aims to ease systems definition and maintenance.
+#
+# For more information, see: https://github.com/1n1/op
+#
+#doc#2 License
+#
+#     Copyright (C) 2015, Iñigo Tejedor Arrondo <http://inigo.me/>
+#
+#     All rights reserved.
+#
+#     Permission to use, copy, modify, and/or distribute this software for any
+#     purpose with or without fee is hereby granted, provided that the above
+#     copyright notice and this permission notice appear in all copies.
+#
+#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#doc#2 Initialization
+#
+# When you call 'op' without arguments, it sources all operations stored in
+# a relative subdirectory from the invocation dir, under ./ops/*
+#
+# Those sourced operations, can reuse this program variables and functions.
+#
+# There are switches to call specific ./ops/ files (-o) and specific requests
+# under ./requests/ (-r). We will reference those custom files as "recipes"
+# from now on.
+#
+# The modes -e and -u, are set at initialization, recipes will be affected
+# by such behavior.
+#
+# By default we're quiet, with the program output. Use -v to see verbose
+# messages.
+#
+# Use --trial on the command line, for test without applying commands.
+#
+#cut#
 set -eu
 
-## By now, only for root can run op. This may change in a future.
-if [ "$(id -u)" -ne 0 ]; then
-  echo >&2 "Only for root. Maybe you can use sudo. Exiting."
-  exit 1
-fi
-
-##
-## The program initializes the following variables, that you can latter
-## reuse in your recipes.
-##
-## * version: The program version.
+#doc#2 Program variables
+#
+# The program initializes the following variables, that you can latter
+# reuse in your recipes.
+#
+# * version: The program version.
+# * op: contains the executable name, used on messages, etc.
+# * work_dir: The directory where the program was invocated.
+# * files: The main directory for files used in recipes.
+# * rollback_dir: The rollback files main directory.
+# * lock: The file used to block against parallel sessions.
+# * verbose: The verbosity switch (bool, default disabled, 0).
+# * trial: The trial switch (bool, default disabled, 0).
+# * nocolor: The colors switch (boold, default disabled, 0).
+# * hostname: It contains the hostname at our launch time.
+#
+#cut#
 version=0.3
-
-## * op: contains the executable name, used on messages, etc.
 op=${0##*/}
-
-## * work_dir: The directory where the program was invocated.
 work_dir="$( pwd )"
-
-## * files: The main directory for files used in recipes.
 files="$work_dir/files"
-
-## * rollback_dir: The rollback files main directory.
 rollback_dir="$work_dir/rollback"
-
-## * lock: The file used to block against parallel sessions.
 lock="$work_dir/.lock"
-
-## * verbose: The verbosity switch (bool, default disabled, 0).
 verbose=0
-
-## * trial: The trial switch (bool, default disabled, 0).
 trial=0
-
-## * nocolor: The colors switch (boold, default disabled, 0).
 nocolor=0
-
-## * hostname: It contains the hostname at our launch time.
 hostname="$( uname -n )"
 
-##
-## The following foreground color variables, are initialized for reusing:
-##
-##     normal, red, green, yellow, blue, magenta, cyan, white
-##
+#doc#2 Color variables
+#
+# The following foreground color variables, are initialized for reusing:
+#
+#     normal, red, green, yellow, blue, magenta, cyan, white
+#cut#
 normal="$(  tput setaf 9; tput sgr0 )"
 red="$(     tput setaf 1; tput bold )"
 green="$(   tput setaf 2; tput bold )"
@@ -104,48 +91,18 @@ magenta="$( tput setaf 5; tput bold )"
 cyan="$(    tput setaf 6; tput bold )"
 white="$(   tput setaf 7; )"
 
-##
-## The help message, is stored in the variable: op_help
-##
-op_help="
-  $op ${blue}v$version $normal <https://inigo.me>
 
-
-  ${green}USAGE:$normal
-    $op COMMAND [ARGUMENTS]
-
-  ${green}COMMANDS:$normal
-    op OP  ..... Run only OP. By default all ops run. See 'op list'.
-    request .... Runs a parametrized request. See 'request list'
-    trial ...... Trial (do not apply any change, only show actions, combined)
-    undo ....... Runs the undo steps, and restores the latest modified ops
-    doc ........ Show detailed documentation, and exit.
-    help ....... Show this help message, and exit
-
-    Sort format (-o) or long format (--op) as well as words (op) are valid.
-
-  ${green}EXAMPLES$normal
-    $op
-    $op op stack trial
-    $op -o stack
-    $op undo
-    $op -v --request typeA param1 param2 ...
-
-"
-
-## +---------------+
-## | Logging files |
-## +---------------+
-
-##
-## Each run, gets a uniq identifier, stored in the variable: run_id
-##
-## This is used to manage the symlinks, to the latest log and the latest
-## rollback directories.
-##
-## The variables 'logs' and 'logfile' will point to our current log during
-## execution. Mostly for internal use.
-##
+#doc#3 Logging variables
+#
+# Each run, gets a uniq identifier, stored in the variable: run_id
+#
+# This is used to manage the symlinks, to the latest log and the latest
+# rollback directories.
+#
+# The variables 'logs' and 'logfile' will point to our current log during
+# execution. Mostly for internal use.
+#
+#cut#
 run_id="$hostname.$( date +'%Y%m%d%H%M%S%N' ).$$"
 
 # Directory to hold the log files.
@@ -154,56 +111,56 @@ logs="$work_dir/logs/$(date +'%Y/%m/%d')"
 # Log file. We use a new one on each run.
 log_file="$logs/$(date +%H-%M-%S.%N).log"
 
-## +-------------------------+
-## | Notifications variables |
-## +-------------------------+
-
-##
-## Notifications are controlled by the boolean: notify_enabled
-##
-## Set to 1 to notify run results, set to 0 to disable notifications.
-notify_enabled=0
-
+#doc#3 Notifications variables
+#
+#
+# Notifications are controlled by the boolean: notify_enabled
+#
+# Set to 1 to notify run results, set to 0 to disable notifications.
+#
 # We start counting, like if there were no changes or errors...
+# HTTP notifications are configured using:
+#
+# http_url: URL to use for the request
+# http_headers: Extra headers in curl format
+# http_options: All of the previous together
+#
+# Use http_options to tune any extra curl option you may need
+#
+#cut#
+notify_enabled=0
 notify=0
-
-## HTTP notifications are configured using:
-##
-## http_url: URL to use for the request
-## http_headers: Extra headers in curl format
-## http_options: All of the previous together
-##
-## Use http_options to tune any extra curl option you may need
 http_url="https://127.0.0.1/report"
 http_headers="-H 'OP: $version' -H 'RunId: $run_id' -H 'Client: $hostname'"
 http_options="-s $http_headers $http_url"
 
-##
-## +--------------------------------------------------+
-## | Functions: Output, messages and general purpose. |
-## +--------------------------------------------------+
-##
-
-##
-## FUNCTION now - prints a timestamp intended for messages.
-##
-## Precision is nanoseconds, this may change for portability in a future.
-##
-## No arguments.
-##
-## USAGE
-##   now
-##
+#doc#2 General purpose functions
+#
+# Functions for Output, messages and general purpose
+#
+#doc#3 FUNCTION now
+#
+# Prints a timestamp intended for messages. Precision is nanoseconds,
+# this may change for portability in a future.
+#
+# No arguments.
+#
+#     USAGE
+#       now
+#
+#cut#
 now () { date +'%Y-%m-%d %H:%M:%S.%N'; }
 
-##
-## FUNCTION log - dispatchs a message to the log.
-##
-## In the process, colors are remved from the message.
-##
-## USAGE
-##   log MSG
-##
+#doc#3 FUNCTION log
+#
+# Dispatchs a message to the log.
+#
+# In the process, colors are remved from the message.
+#
+#     USAGE
+#       log MSG
+#
+#cut#
 log () {
   local normal=""
   local red=""
@@ -217,12 +174,14 @@ log () {
     "$(now)" "${USER:+$USER}${SUDO_USER:+"/$SUDO_USER"}" "$msg" >> "$log_file";
 }
 
-##
-## FUNCTION assert - finishes a step as [DONE].
-##
-## USAGE
-##   assert MSG
-##
+#doc#3 FUNCTION log
+#
+# FUNCTION assert - finishes a step as [DONE].
+#
+#     USAGE
+#       assert MSG
+#
+#cut#
 assert () {
   if [ "$verbose" = 1 ]; then
     printf "$normal[${green}DONE${normal}] %s\n" "$*"
@@ -230,37 +189,43 @@ assert () {
   log "DONE $*"
 }
 
-##
-## FUNCTION error - triggers an ERROR with the given message..
-##
-## Errors trigger notifications if they are enabled. Do not stop execution.
-##
-## USAGE
-##   error MSG
-##
+#doc#3 FUNCTION error
+#
+# Triggers an ERROR with the given message..
+#
+# Errors trigger notifications if they are enabled. Do not stop execution.
+#
+#     USAGE
+#       error MSG
+#
+#cut#
 error () {
   notify
   printf "$normal[${red}ERROR${normal}] %s\n" "$*" 2>&1
   log "ERROR $*"
 }
 
-##
-## FUNCTION die - triggers a fatal ERROR, finishing the execution.
-##
-## USAGE
-##   die MSG
-##
+#doc#3 FUNCTION die
+#
+# Triggers a fatal ERROR, finishing the execution.
+#
+#     USAGE
+#       die MSG
+#
+#cut#
 die () {
   error "$*"
   exit 1
 }
 
-##
-## FUNCTION info - dispatch a INFO message.
-##
-## USAGE
-##   info MSG
-##
+#doc#3 FUNCTION info
+#
+# Dispatch a INFO message.
+#
+#     USAGE
+#       info MSG
+#
+#cut#
 info () {
   if [ "$verbose" = 1 ]; then
     printf "$normal[${blue}INFO${normal}] ${blue}%s${normal}\n" "$*"
@@ -268,28 +233,32 @@ info () {
   log "INFO $*"
 }
 
-##
-## FUNTION report - reports a CHANGE.
-##
-## Runs with changes are notified (if enabled).
-##
-## USAGE
-##   report MSG
-##
+#doc#3 FUNTION report
+#
+# Reports a CHANGE.
+#
+# Runs with changes are notified (if enabled).
+#
+#     USAGE
+#       report MSG
+#
+#cut#
 report () {
   notify
   printf "$normal[${yellow}CHANGE${normal}] %s\n" "$*" || :
   log "CHANGE $*"
 }
 
-##
-## FUNCTION cmd - runs the given command, aware of the TRIAL mode (-t).
-##
-## Prefix cp, rm, mv. find, etc commands with 'cmd ' in front of them.
-##
-## USAGE
-##   cmd CMD ARG1 ARG2
-##
+#doc#3 FUNCTION cmd
+#
+# Runs the given command, unless we're in TRIAL mode (-t).
+#
+# Prefix cp, rm, mv. find, etc commands with 'cmd ' in front of them.
+#
+#     USAGE
+#       cmd CMD ARG1 ARG2
+#
+#cut#
 cmd () {
   if [ "$trial" = 0 ]; then
     notify
@@ -305,12 +274,14 @@ cmd () {
   fi
 }
 
-##
-## FUNCTION dir_is_empty - true if the given dir is empty.
-##
-## USAGE
-##   dir_is_empty DIR
-##
+#doc#3 FUNCTION dir_is_empty
+#
+# True if the given dir is empty.
+#
+#     USAGE
+#       dir_is_empty DIR
+#
+#cut#
 dir_is_empty () {
   set -- "$1"/*
   if test -e "$1" || test -L "$1"; then
@@ -320,33 +291,35 @@ dir_is_empty () {
   fi
 }
 
-##
-## +------------------------+
-## | Notification functions |
-## +------------------------+
-##
-
-##
-## FUNCTION notify - triggers the notification of the current run.
-##
-## Notifications are send from an EXIT trap. This function, will trigger
-## them if they are enabled:
-##
-## USAGE
-##   notify
-##
+#doc#2 Notification functions
+#
+# Functions related to change detection notifications.
+#
+#doc#3 FUNCTION notify
+#
+# Triggers the notification of the current run.
+#
+# Notifications are send from an EXIT trap. This function, will trigger
+# them if they are enabled:
+#
+#     USAGE
+#       notify
+#
+#cut#
 notify () {
   [ "$notify_enabled" = 1 ] && notify=1 || notify=0
 }
 
-##
-## FUNCTION notify_run - function to trigger notifications on EXIT trap
-##
-## No arguments required.
-##
-## USAGE
-##   notify_run
-##
+#doc#3 FUNCTION notify_run
+#
+#  Function to trigger notifications at the EXIT trap
+#
+# No arguments required.
+#
+#     USAGE
+#       notify_run
+#
+#cut#
 notify_run () {
   if [ "$notify_enabled" = 1 ] && [ "$notify" = 1 ]; then
     info "Running notification"
@@ -363,20 +336,20 @@ notify_run () {
   fi
 }
 
-##
-## +------------------------+
-## | Rolling-back functions |
-## +------------------------+
-##
-
-##
-## FUNCTION rollback_path - Save modified files and directories.
-##
-## See undo_last_changes too.
-##
-## USAGE
-##   rollback_path /path/to/file
-##
+#doc#2 Rolling back functions
+#
+# Functions related to change detection notifications.
+#
+#doc#3 FUNCTION rollback_path
+#
+# Save modified files and directories.
+#
+# See undo_last_changes too.
+#
+#     USAGE
+#       rollback_path /path/to/file
+#
+#cut#
 rollback_path () {
 
   local file="$1"
@@ -404,17 +377,19 @@ rollback_path () {
   fi
 }
 
-##
-## FUNCTION rollback_cmd - Function used to save modified steps.
-##
-## Usually you register a command to do the opposite than the previous or
-## the next command.
-##
-## See undo_last_changes too.
-##
-## USAGE
-##   rollback_cmd mycommand --to-do-the-opossite-step
-##
+#doc#3 FUNCTION rollback_cmd
+#
+# Function used to save modified steps.
+#
+# Usually you register a command to do the opposite than the previous or
+# the next command.
+#
+# See undo_last_changes too.
+#
+#     USAGE
+#       rollback_cmd mycommand --to-do-the-opossite-step
+#
+#cut#
 rollback_cmd () {
 
   local l="$rollback_dir/latest.undo"
@@ -441,65 +416,71 @@ rollback_cmd () {
   fi
 }
 
-##
-## FUNCTION undo_last_files - Rollback the last filesystem changeset
-##
-## Well, really print the files found, fixme.
-##
-## USAGE
-##   undo_last_files
-##
+#doc#3 FUNCTION undo_last_files
+#
+# Rollback the last filesystem changeset
+#
+# Well, really print the files found, fixme.
+#
+#     USAGE
+#       undo_last_files
+#
+#cut#
 undo_last_files () {
   for file in find "$rollback_dir/latest/"; do
     echo found "$file"
   done
 }
 
-##
-## FUNCTION undo_last_commands - Rollback the last commands changeset
-##
-## Well, really print the code that should run, fixme.
-##
-## USAGE
-##   undo_last_commands
-##
+#doc#3 FUNCTION undo_last_commands
+#
+# Rollback the last commands changeset
+#
+# Well, really print the code that should run, fixme.
+#
+#     USAGE
+#       undo_last_commands
+#
+#cut#
 undo_last_commands () {
   if [ -e "$rollback_dir/latet.undo/steps" ]; then
     cat "$rollback_dir/latet.undo/steps"
   fi
 }
 
-##
-## FUNCTION undo_last_changes - Generic rollback invocation
-##
-## Important: The filesystem is restored first, and the commands run after.
-##
-## USAGE
-##   undo_last_changes
-##
+#doc#3 FUNCTION undo_last_changes
+#
+# Generic rollback invocation
+#
+# Important: The filesystem is restored first, and the commands run after.
+#
+#     USAGE
+#       undo_last_changes
+#
+#cut#
 undo_last_changes () {
   undo_last_files
   undo_last_commands
 }
 
-##
-## +------------------------+
-## | File related functions |
-## +------------------------+
-##
-
-##
-## FUNCTION permissions - Sets the given permissions.
-##
-## The content is ignored. Argument order matters.
-##
-## USAGE
-##   permissions PATH OWNER GROUP MODE
-##
-## EXAMPLES
-##   permissions /path/to/dir  root root  750
-##   permissions /path/to/file oper oper 0644
-##
+#doc#2 File functions
+#
+# Functions related to file and directory manipulations
+#
+#doc#3 FUNCTION permissions
+#
+# Sets the given permissions on a file.
+#
+# The content is ignored. Argument order matters.
+#
+#     USAGE
+#       permissions PATH OWNER GROUP MODE
+#
+#     EXAMPLES
+#       permissions /path/to/dir  root root  750
+#       permissions /path/to/file oper oper 0644
+#
+#cut#
 permissions () {
 
   local item="$1"
@@ -538,7 +519,7 @@ EOF
     report "Saving rollback for permissions change on: ${blue}$item${normal}"
     rollback_cmd info "YOU SHOULD: chown $owner:$group '$item'"
     report "Setting ownership for $item (wanted: $item_owner:$item_group, existing: $owner:$group)"
-    cmd chown "$item_owner:$item_group" -- "$item"
+    cmd chown "$item_owner:$item_group" -- "$item" # FIXME plain user mode
   fi
 
   #
@@ -550,17 +531,19 @@ EOF
     report "Saving rollback for permissions change on: $item"
     rollback_cmd info "YOU SHOULD: chmod $mode -- '$item'"
     report "Setting up permissions for $item (wanted: $item_mode, existing: $mode)"
-    cmd chmod "$item_mode" -- "$item"
+    cmd chmod "$item_mode" -- "$item" # FIXME plain user mode
   fi
 }
 
-##
-## FUNCTION directory - Ensures a directory
-##
-## USAGE
-##   directory -n /path/to/dir -o root -g root -m 700
-##   directory name /path/to/dir ensure absent
-##
+#doc#3 FUNCTION directory
+#
+# Ensures a directory
+#
+#     USAGE
+#       directory -n /path/to/dir -o root -g root -m 700
+#       directory name /path/to/dir ensure absent
+#
+#cut#
 directory () {
 
   local args="$*"
@@ -645,13 +628,15 @@ directory () {
   fi
 }
 
-##
-## FUNCTION file - Ensures a file from op files
-##
-## USAGE
-##  file -n /path/to/file -o root -g root -m 400 -t "echo trigger command"
-##  file -n /path/to/file -e absent
-##
+#doc#3 FUNCTION file
+#
+# Ensures a file from op files
+#
+#     USAGE
+#      file -n /path/to/file -o root -g root -m 400 -t "echo trigger command"
+#      file -n /path/to/file -e absent
+#
+#cut#
 file () {
 
   local args="$*"
@@ -718,7 +703,7 @@ file () {
       cmd diff -Nau -- "$file_name" "$files$file_name" || :
       rollback_path "$file_name"
       report "Setting up: $file_name_c"
-      cmd cp -- "$files$file_name" "${file_name%/*}/"
+      cmd cp -f -- "$files$file_name" "${file_name%/*}/"
       file_trigger_run='1'
     fi
   else
@@ -749,22 +734,22 @@ file () {
   fi
 }
 
-##
-## +------------------------------+
-## | Package management functions |
-## +------------------------------+
-##
-
-##
-## FUNCTION pkg - ensure given (.deb) packages status
-##
-## Argument order matters, first the orders, last the packages.
-##
-## USAGE
-##   pkg present pkg1 pkg2
-##   pkg absent pkg1 pkg2
-##   pkg trigger whatever absent pkg1
-##
+#doc#2 Package management functions
+#
+# Functions related to package management.
+#
+#doc#3 FUNCTION pkg
+#
+# Ensure given (debian) packages status
+#
+# Argument order matters, first the orders, last the packages.
+#
+#     USAGE
+#       pkg present pkg1 pkg2
+#       pkg absent pkg1 pkg2
+#       pkg trigger whatever absent pkg1
+#
+#cut#
 pkg () {
 
   local cmd=''
@@ -848,15 +833,17 @@ pkg () {
   fi
 }
 
-##
-## FUNCTION aptkey - ensure an apt key
-##
-## FIXME needs review, works for my usage, rollback maybe broken
-##
-## USAGE
-##   aptkey present /path/to/filename.key  # ex: nginx_signing.key
-##   aptkey absent keyid                   # ex: 7BD9BF62
-##
+#doc#3 FUNCTION aptkey
+#
+# Ensure an apt key
+#
+# FIXME needs review, works for my usage, rollback maybe broken
+#
+#     USAGE
+#       aptkey present /path/to/filename.key  # ex: nginx_signing.key
+#       aptkey absent keyid                   # ex: 7BD9BF62
+#
+#cut#
 aptkey () {
   case $1 in
     -p|--present|present)
@@ -892,19 +879,19 @@ aptkey () {
 }
 
 
-##
-## +----------------------------+
-## | Users and groups functions |
-## +----------------------------+
-##
-
-##
-## FUNCTION group - ensure a system group
-##
-## USAGE
-##   group name oper gid 2222 members oper
-##   group name oper ensure absent
-##
+#doc#2 Users and groups functions
+#
+# Functions related to system users and groups
+#
+#doc#3 FUNCTION group
+#
+# Ensure a system group
+#
+#     USAGE
+#       group name oper gid 2222 members oper
+#       group name oper ensure absent
+#
+#cut#
 group () {
 
   local args="$*"
@@ -998,15 +985,17 @@ EOF
   esac
 }
 
-##
-## FUNCTION user - ensure the given user configuration
-##
-## TO-DO Rreview and add more options.
-##
-## USAGE
-##   user name oper groups oper,wheel pass 'PLAINTEXT'
-##   user name oper ensure absent
-##
+#doc#3 FUNCTION user
+#
+# Ensure the given user configuration
+#
+# TO-DO Rreview and add more options.
+#
+#     USAGE
+#       user name oper groups oper,wheel pass 'PLAINTEXT'
+#       user name oper ensure absent
+#
+#cut#
 user () {
 
   local args="$*"
@@ -1071,18 +1060,295 @@ EOF
 # | nagios/opsview check helpers. |
 # +-------------------------------+
 #
+# To-Do better integration of op definitions with this
 
 ok () {       echo "OK- $*";       exit 0; }
 warn () {     echo "WARNING- $*";  exit 1; }
 critical () { echo "CRITICAL- $*"; exit 2; }
 unknown () {  echo "UNKNOWN- $*";  exit 3; }
 
-#
-# +--------------------------------------+
-# | Initialization and argument parsing. |
-# +--------------------------------------+
-#
 
+#doc#3 FUNCTION doc
+#
+# Query and extract the nested documentation.
+#
+#     USAGE
+#       doc [topics|TOPIC]
+#
+#     EXAMPLES
+#       doc topics        # List them all
+#       doc FUNCTION      # Request all topics matching FUNCTION
+#       doc FUNCTION doc  # Show this help
+#cut#
+doc () {
+
+  local file="$( which "$0" )"
+  local matched=0 result='' topic='' topics='' st=0 level=1
+  local query="${1:-full}"
+
+  case $query in
+    full)   topic=''; st=0 ;;
+    topics) st=1 ;;
+    *[!a-zA-Z_\ ]*) die "Wrong argument $query" ;;
+    *) topic="$query${3:+"\ $3"}" ;;
+  esac
+
+  local newline="
+"
+  while read -r line; do
+    case $line in
+      \#doc#*$topic*)
+        if [ -z "$topic" ]; then
+          [ "$st" -eq 1 ] && {
+            topics="$topics$newline$topic${line#*#doc#* $topic}"
+          }
+          local level="${line#*#doc#}"
+          level=$( echo "$level" | cut -d ' ' -f 1 )
+          if [ "$level" = ' ' ]; then
+            level=1
+            line=${line#*#doc# }
+          else
+            line=${line#*#doc#$level}
+          fi
+          result=$result$newline$( doc_title "$level" "$line" )
+          matched=1
+        else
+          local level=${line#*#doc#}
+          level=$( echo "$level" | cut -d ' ' -f 1 )
+          if [ "$level" = ' ' ]; then
+            level=1
+            line=${line#*#doc# }
+          else
+            line=${line#*#doc#$level}
+          fi
+          result=$result$newline$( doc_title "$level" "${line# }" )
+          matched=1
+        fi
+      ;;
+      \#doc#*)
+        if [ -n "$topic" ] && [ "$matched" -eq 1 ]; then
+          break
+        fi
+      ;;
+      \#cut#*)
+        matched=0
+      ;;
+      \#*)
+        if [ "$matched" -eq 1 ]; then
+          line="${line#\#}"
+          result="$result$newline${line#\ }"
+        fi
+      ;;
+      *) : ;;
+    esac
+  done < "$file"
+
+  if [ "$st" -eq 1 ]; then result="${topics#$newline}"; fi
+  printf -- '%s\n' "$result"
+}
+
+#doc#3 FUNCTION doc_title
+#
+# Create a markdown title of the given level (1 to 6)
+#
+#     USAGE
+#       doc_title 4 "My title"
+#
+#cut#
+doc_title () {
+  local level="$1"
+  local title="$2"
+  case $level in
+    1)  printf -- '# %s\n' "$title" ;;
+    2)  printf -- '## %s\n' "$title" ;;
+    3)  printf -- '### %s\n' "$title" ;;
+    4)  printf -- '#### %s\n' "$title" ;;
+    5)  printf -- '##### %s\n' "$title" ;;
+    6)  printf -- '###### %s\n' "$title" ;;
+    *)  die "Unknown heading level: $level" ;;
+  esac
+}
+
+#doc#3 FUNCTION run_op_init
+#
+# This is an internal function, to initialize runs.
+#
+#     USAGE
+#       run_op_init
+#
+#cut#
+run_op_init () {
+  #
+  # If still didn't exit, we're going to launch operations.
+  # Initialize the log.
+  #
+  (umask 077; mkdir -p "${log_file%/*}"; )
+  ln -sf "$log_file" "$work_dir/logs/latest"
+
+  #
+  # Initially it was intended for root, but now can run as plain user
+  #
+  if [ "$(id -u)" -ne 0 ]; then
+    info "Running as plain user, some operations may require higher privileges."
+  fi
+
+  [ -d "$work_dir/ops" ] || die "You need to define some operations first."
+  [ "$( echo "$work_dir"/ops/* )" ] || die "You need to define some operations first."
+
+  #
+  # Block parallel runs from ourself
+  #
+  if mkdir -p "${lock%/*}" && mkdir "$lock"; then
+    trap 'notify_run; [ -r "$lock" ] && rm -rf "$lock"; exit' EXIT
+    echo "$$" > "$lock/PID"
+  else
+    if [ -e $lock/PID ]; then
+      bad_pid="$( cat "$lock/PID" )"
+      if kill -0 $bad_pid 2>/dev/null; then
+        error "Other instance is running, or there is a staled lock. Exiting."
+        error "Save this information for report:
+  $( stat $lock )
+  PID: ${bad_pid:-'UNKNOWN'}
+  $(ps auxfwww | grep "$bad_pid")
+  "
+      else
+        info "Removing stalled lock and re-executing"
+        rm -rf "$lock"
+        ./$op "$@"
+        exit
+      fi
+    fi
+    die "Could not gain lock. Exiting."
+  fi
+}
+
+#doc#3 FUNCTION run_op
+#
+# This is an internal function, to launch operations or requests.
+#
+#     USAGE
+#       run_op "$@"
+#
+#cut#
+run_op () {
+
+  run_op_init
+  #
+  # If no operation is given run them all.
+  #
+  if [ -z "${op_default:-}" ]; then
+    if dir_is_empty "$work_dir/ops"; then
+      die "You need to define some operations to run."
+    else
+      # syntax check all operation files
+      for f in "$work_dir/ops/"*; do sh -n "$f" || exit; done
+      # and source them all
+      for f in "$work_dir/ops/"*; do . "$f"; done
+      exit
+    fi
+  # Or if some specific operation is given, run only that one.
+  elif [ -e "$op_default" ]; then
+    if sh -n -- "$op_default"; then
+      if . "$op_default"; then
+        assert "Finished ${green}OK${normal}: $op_default"
+      else
+        die "exit with code: ${red}${?}${normal} $op_default"
+      fi
+    else
+      die "invalid syntax in: ${red}${op_default}${normal}"
+    fi
+  else
+    die "could not read file: ${red}${op_default}${normal}"
+  fi
+}
+
+#doc#3 FUNCTION import_path
+#
+# Imports the given path to the op ```./files/``` tree.
+#
+# The given argument, should be an **absolute** path.
+#
+#     USAGE
+#       import_path PATH
+#
+#cut#
+import_path () {
+  run_op_init
+  local path="$1"
+  if [ -r "$path" ]; then
+    if [ -r "./files/$path" ]; then
+      die "Already exists: ./files/$path"
+    else
+      d="./files/${path%/*}"
+      if cmd mkdir -p -- "$d"; then
+        report "Added directory: $d"
+        cmd cp -a -- "$path" "${d:?'ooops'}/"
+        report "Added: $path"
+      else
+        die "Couldn't import: $2"
+      fi
+    fi
+  else
+    die "Cannot read: $2"
+  fi
+}
+
+#doc#3 FUNCTION op_help
+#
+# Prints the ```op``` help message and exits the program.
+#
+# If a numeric argument is given, exits with that status.
+#
+# If more arguments ar given, print them before the help meassage.
+#
+#     USAGE
+#       ophelp
+#       >&2 op_help 4 "Exiting with error 4"
+#
+#cut#
+op_help () {
+
+  local status=$?
+
+  case $# in
+    0) status=$status ;;
+    1) status=$1 ;;
+    *) status=$1; shift; printf >&2 "${red}\n %s\n${normal}" "$*" ;;
+  esac
+
+  echo "
+  $op ${blue}v$version $normal <https://inigo.me>
+
+
+  ${green}USAGE:$normal
+    $op COMMAND [ARGUMENTS]
+
+  ${green}COMMANDS:$normal
+    op OP  ................ Run only OP. By default all ops run. See 'op list'
+    request NAME [ARGS] ... Runs a parametrized request. See 'request list'
+    trial ................. Trial mode (do not apply any change)
+    import PATH ........... Imports a given path, into the op tree
+    undo .................. Rollback steps, and restore the modified files
+    doc [topics|TOPIC] .... Show detailed documentation, and exit
+    help .................. Show this help message, and exit
+
+    Sort format (-o) or long format (--op) as well as words (op) are valid.
+
+  ${green}EXAMPLES$normal
+    $op
+    $op op stack trial
+    $op -o stack
+    $op undo
+    $op -v --request typeA param1 param2
+    $op trial import /etc/hosts
+
+"
+  exit "$status"
+}
+
+#
+# Parse the command line arguments
+#
 while [ $# -gt 0 ]; do
   case $1 in
     -o|--op|op)
@@ -1091,10 +1357,10 @@ while [ $# -gt 0 ]; do
           for i in ./ops/*; do
             printf '%s\n' "${i##./ops/}"
           done
-          return
+          exit
         ;;
         *)
-          :
+          run_op "$@"
         ;;
       esac
       if [ "$#" -ge 2 ]; then
@@ -1110,8 +1376,7 @@ while [ $# -gt 0 ]; do
           exit 1
         fi
       else
-        printf '%s' "$op_help" >&2
-        exit 1
+        >&2 op_help 1
       fi
     ;;
     -r|--request|request)
@@ -1122,7 +1387,9 @@ while [ $# -gt 0 ]; do
           done
           return
         ;;
-        *) : ;;
+        *)
+        run_op "$@"
+        ;;
       esac
       if [ "$#" -ge 2 ]; then
         if [ -e "./requests/$2" ]; then
@@ -1136,13 +1403,19 @@ while [ $# -gt 0 ]; do
           for i in ./requests/*; do
             printf '%s\n' "${i##./requests/}"
           done
-          printf '%s' "$op_help" >&2
-          exit 1
+          >&2 op_help 1
         fi
       else
-        printf '%s' "$op_help" >&2
-        exit 1
+        >&2 op_help 1
       fi
+    ;;
+    -i|--import|import)
+      if [ "$#" -eq 2 ]; then
+        import_path "$2"
+      else
+        >&2 op_help 1
+      fi
+      exit
     ;;
     -n|--nocolor|nocolor)
       nocolor=1
@@ -1167,93 +1440,27 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
     -d|--doc|doc)
-      grep '^##' "$(readlink -f $0)"| sed 's/^##//' | sed 's/^ //' | ${PAGER:-less}
-      exit
+      shift 1
+      doc "$@"
+      exit $?
     ;;
     -h|--help|help)
-      printf '%s' "$op_help"
-      exit
+      op_help 0
     ;;
     *)
-      printf '%s' "$op_help" >&2
-      exit 1 
+      op_help 1 "Unknown argument: $1"
     ;;
   esac
 done
 
-#
-# If still didn't exit, we're going to launch operations.
-# Initialize the log.
-#
-(umask 077; mkdir -p "${log_file%/*}"; )
-ln -sf "$log_file" "$work_dir/logs/latest"
 
-[ -d "$work_dir/ops" ] || die "You need to define some operations first."
-#[ "$( echo "$work_dir"/ops/* )" || die "You need to define some operations first."
-
+#doc#3 SEE ALSO
 #
-# Block parallel runs from ourself
+# See the project page at: http://1n1.github.io/op/
 #
-if mkdir -p "${lock%/*}" && mkdir "$lock"; then
-  trap 'notify_run; [ -r "$lock" ] && rm -rf "$lock"; exit' EXIT
-  echo "$$" > "$lock/PID"
-else
-  if [ -e $lock/PID ]; then
-    bad_pid="$( cat "$lock/PID" )"
-    if kill -0 $bad_pid 2>/dev/null; then
-      error "Other instance is running, or there is a staled lock. Exiting."
-      error "Save this information for report:
-$( stat $lock )
-PID: ${bad_pid:-'UNKNOWN'}
-$(ps auxfwww | grep "$bad_pid")
-"
-    else
-      echo >&2 "Removing stalled lock and re-executing"
-      rm -rf "$lock"
-      ./$op "$@"
-      exit
-    fi
-  fi
-  die "Could not lock. Exiting."
-fi
-
+# And the source repository at: https://github.com/1n1/op
 #
-# If no operation is given run them all.
+# Happy operations!
 #
-if [ -z "${op_default:-}" ]; then
-  if dir_is_empty "$work_dir/ops"; then
-    die "You need to define some operations to run."
-  else
-    # syntax check all operation files
-    for f in "$work_dir/ops/"*; do sh -n "$f" || exit; done
-    # and source them all
-    for f in "$work_dir/ops/"*; do . "$f"; done
-    exit
-  fi
-# Or if some specific operation is given, run only that one.
-elif [ -e "$op_default" ]; then
-  if sh -n -- "$op_default"; then
-    if . "$op_default"; then
-      assert "Finished ${green}OK${normal}: $op_default"
-    else
-      die "exit with code: ${red}${?}${normal} $op_default"
-    fi
-  else
-    die "invalid syntax in: ${red}${op_default}${normal}"
-  fi
-else
-  die "could not read file: ${red}${op_default}${normal}"
-fi
-
-##
-## +----------+
-## | See Also |
-## +----------+
-##
-## See the project page at: http://1n1.github.io/op/
-##
-## And the source repository at: https://github.com/1n1/op
-##
-## Happy operations!
-##
+#cut#
 
