@@ -1236,7 +1236,7 @@ run_op () {
   #
   # If no operation is given run them all.
   #
-  if [ "$op_default" = 'all' ]; then
+  if [ "$op_default" = all ]; then
     if dir_is_empty "$work_dir/ops"; then
       die "You need to define some operations to run."
     else
@@ -1367,7 +1367,7 @@ while [ $# -gt 0 ]; do
         if [ -e "./ops/$2" ]; then
           op_default="./ops/$2"
           shift 2
-        elif [ "$2" = 'all' ]; then
+        elif [ "$2" = all ]; then
           op_default="all"
           shift 2
         else
@@ -1456,7 +1456,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-op_default="${op_default:-'all'}"
+op_default="${op_default:-all}"
 run_op
 
 #doc#3 SEE ALSO
