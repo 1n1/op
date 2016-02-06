@@ -1005,6 +1005,7 @@ user () {
   local login='';
   local groups='';
   local pass='';
+  local shell='';
   local home='';
 
   while [ $# -gt 0 ]; do
@@ -1014,7 +1015,8 @@ user () {
       -g|--groups|groups)           groups=${2:?"$error"}      ;;
       -h|--home|home)               home=${2:?"$error"}        ;;
       -l|--login|login)             login=${2:?"$error"}       ;;
-      -p|--login|pass)              pass=${2:?"$error"}        ;;
+      -p|--pass|pass)               pass=${2:?"$error"}        ;;
+      -s|--shell|shell)             shell=${2:?"$error"}       ;;
       *) die "$error" ;;
     esac
     shift 2
@@ -1043,6 +1045,7 @@ user () {
         local opts=''
         [ -n "$groups" ] && opts="$opts -g $(echo $groups | sed 's/,/ -g /g')"
         [ -n "$home" ] && opts="$opts -d $home"
+        [ -n "$shell" ] && opts="$opts -s $shell"
         cmd useradd $opts -- "$login"
         rollback_cmd info "YOUR SHOULD DELETE: $(getent passwd "$login")"
       fi
