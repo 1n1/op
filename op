@@ -1259,10 +1259,10 @@ import_path () {
   run_op_init
   local path="$1"
   if [ -r "$path" ]; then
-    if [ -r "./files/$path" ]; then
-      die "Already exists: ./files/$path"
+    if [ -r "$files/$path" ]; then
+      die "Already exists: $files/$path"
     else
-      d="./files/${path%/*}"
+      d="$files/${path%/*}"
       if cmd mkdir -p -- "$d"; then
         report "Added directory: $d"
         cmd cp -a -- "$path" "${d:?'ooops'}/"
@@ -1337,8 +1337,8 @@ while [ $# -gt 0 ]; do
     -o|--op|op)
       case $* in
         (*'list'*|*'-l'*|*'--list'*)
-          for i in ./ops/*; do
-            printf '%s\n' "${i##./ops/}"
+          for i in "$work_dir"/ops/*; do
+            printf '%s\n' "${i##$work_dir/ops/}"
           done
           exit
         ;;
@@ -1347,8 +1347,8 @@ while [ $# -gt 0 ]; do
         ;;
       esac
       if [ "$#" -ge 2 ]; then
-        if [ -e "./ops/$2" ]; then
-          op_default="./ops/$2"
+        if [ -e "$work_dir/ops/$2" ]; then
+          op_default="$work_dir/ops/$2"
           shift 2
         elif [ "$2" = all ]; then
           op_default="all"
@@ -1356,8 +1356,8 @@ while [ $# -gt 0 ]; do
         else
           error "Unknown operation type: $2"
           error "List of known operations:"
-          for i in ./ops/*; do
-            printf ' %s\n' "${i##./ops/}" >&2
+          for i in "$work_dir"/ops/*; do
+            printf ' %s\n' "${i##$work_dir/ops/}" >&2
           done
           exit 1
         fi
@@ -1368,8 +1368,8 @@ while [ $# -gt 0 ]; do
     -r|--request|request)
       case $* in
         (*'list'*|*'-l'*|*'--list'*)
-          for i in ./requests/*; do
-            printf '%s\n' "${i##./requests/}"
+          for i in "$work_dir"/requests/*; do
+            printf '%s\n' "${i##$work_dir/requests/}"
           done
           return
         ;;
@@ -1378,16 +1378,16 @@ while [ $# -gt 0 ]; do
         ;;
       esac
       if [ "$#" -ge 2 ]; then
-        if [ -e "./requests/$2" ]; then
-          op_default="./requests/$2"
+        if [ -e "$work_dir/requests/$2" ]; then
+          op_default="$work_dir/requests/$2"
           shift 2
           request_args="$*"
           shift "$#"
         else
           error "Unknown request type: $2"
           error "List of known requests:"
-          for i in ./requests/*; do
-            printf '%s\n' "${i##./requests/}"
+          for i in $work_dir/requests/*; do
+            printf '%s\n' "${i##$work_dir/requests/}"
           done
           >&2 op_help 1
         fi
