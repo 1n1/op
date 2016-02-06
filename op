@@ -1360,13 +1360,15 @@ while [ $# -gt 0 ]; do
           exit
         ;;
         *)
-          op_default=all
-          run_op "$@"
+          :
         ;;
       esac
       if [ "$#" -ge 2 ]; then
         if [ -e "./ops/$2" ]; then
           op_default="./ops/$2"
+          shift 2
+        elif [ "$2" = 'all' ]; then
+          op_default="all"
           shift 2
         else
           error "Unknown operation type: $2"
@@ -1454,6 +1456,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+op_default="${op_default:-'all'}"
+run_op
 
 #doc#3 SEE ALSO
 #
