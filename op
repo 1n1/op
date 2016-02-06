@@ -1236,7 +1236,7 @@ run_op () {
   #
   # If no operation is given run them all.
   #
-  if [ -z "${op_default:-}" ]; then
+  if [ "$op_default" = 'all' ]; then
     if dir_is_empty "$work_dir/ops"; then
       die "You need to define some operations to run."
     else
@@ -1360,6 +1360,7 @@ while [ $# -gt 0 ]; do
           exit
         ;;
         *)
+          op_default=all
           run_op "$@"
         ;;
       esac
