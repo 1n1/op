@@ -1,49 +1,29 @@
 #!/bin/sh
 
-#doc#1 Introduction to op
-#
-# op - The opertions tool
+#doc#1 op - *The* operations tool
 #
 # This program, aims to ease systems definition and maintenance.
 #
 # For more information, see: https://github.com/1n1/op
 #
-#doc#2 License
-#
-#     Copyright (C) 2015, Iñigo Tejedor Arrondo <http://inigo.me/>
-#
-#     All rights reserved.
-#
-#     Permission to use, copy, modify, and/or distribute this software for any
-#     purpose with or without fee is hereby granted, provided that the above
-#     copyright notice and this permission notice appear in all copies.
-#
-#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-#
 #doc#2 Initialization
 #
-# When you call 'op' without arguments, it sources all operations stored in
-# a relative subdirectory from the invocation dir, under ./ops/*
+# When you call ```op``` without arguments, it sources all operations stored
+# in a relative subdirectory from the invocation dir, under ```./ops/*```.
 #
 # Those sourced operations, can reuse this program variables and functions.
 #
-# There are switches to call specific ./ops/ files (-o) and specific requests
-# under ./requests/ (-r). We will reference those custom files as "recipes"
-# from now on.
+# There are switches to call specific ```./ops/``` files (```-o```) and
+# specific requests under ```./requests/``` with (```-r```). We will reference
+# those custom files as "recipes" from now on.
 #
-# The modes -e and -u, are set at initialization, recipes will be affected
-# by such behavior.
-#
-# By default we're quiet, with the program output. Use -v to see verbose
+# By default we're quiet, with the program output. Use ```-v``` to see verbose
 # messages.
 #
-# Use --trial on the command line, for test without applying commands.
+# Use ```--trial``` on the command line, for test without applying commands.
+#
+# The modes ```-e``` and ```-u```, are set at initialization, recipes will be
+# affected by such behavior.
 #
 #cut#
 set -eu
@@ -53,16 +33,16 @@ set -eu
 # The program initializes the following variables, that you can latter
 # reuse in your recipes.
 #
-# * version: The program version.
-# * op: contains the executable name, used on messages, etc.
-# * work_dir: The directory where the program was invocated.
-# * files: The main directory for files used in recipes.
-# * rollback_dir: The rollback files main directory.
-# * lock: The file used to block against parallel sessions.
-# * verbose: The verbosity switch (bool, default disabled, 0).
-# * trial: The trial switch (bool, default disabled, 0).
-# * nocolor: The colors switch (boold, default disabled, 0).
-# * hostname: It contains the hostname at our launch time.
+# * ```version```: The program version.
+# * ```op```: contains the executable name, used on messages, etc.
+# * ```work_dir```: The directory where the program was invocated.
+# * ```files```: The main directory for files used in recipes.
+# * ```rollback_dir```: The rollback files main directory.
+# * ```lock```: The file used to block against parallel sessions.
+# * ```verbose```: The verbosity switch (bool, default disabled, 0).
+# * ```trial```: The trial switch (bool, default disabled, 0).
+# * ```nocolor```: The colors switch (boold, default disabled, 0).
+# * ```hostname```: It contains the hostname at our launch time.
 #
 #cut#
 version=0.3
@@ -94,13 +74,13 @@ white="$(   tput setaf 7; )"
 
 #doc#3 Logging variables
 #
-# Each run, gets a uniq identifier, stored in the variable: run_id
+# Each run, gets a uniq identifier, stored in the variable: ```run_id```
 #
 # This is used to manage the symlinks, to the latest log and the latest
 # rollback directories.
 #
-# The variables 'logs' and 'logfile' will point to our current log during
-# execution. Mostly for internal use.
+# The variables ```logs``` and ```logfile``` will point to our current
+# log during execution. For internal use.
 #
 #cut#
 run_id="$hostname.$( date +'%Y%m%d%H%M%S%N' ).$$"
@@ -114,18 +94,18 @@ log_file="$logs/$(date +%H-%M-%S.%N).log"
 #doc#3 Notifications variables
 #
 #
-# Notifications are controlled by the boolean: notify_enabled
+# Notifications are controlled by the boolean: ```notify_enabled```
 #
 # Set to 1 to notify run results, set to 0 to disable notifications.
 #
 # We start counting, like if there were no changes or errors...
 # HTTP notifications are configured using:
 #
-# http_url: URL to use for the request
-# http_headers: Extra headers in curl format
-# http_options: All of the previous together
+# ```http_url```: URL to use for the request
+# ```http_headers```: Extra headers in curl format
+# ```http_options```: All of the previous together
 #
-# Use http_options to tune any extra curl option you may need
+# Use ```http_options``` to tune any extra curl option you may need.
 #
 #cut#
 notify_enabled=0
@@ -138,7 +118,7 @@ http_options="-s $http_headers $http_url"
 #
 # Functions for Output, messages and general purpose
 #
-#doc#3 FUNCTION now
+#doc#3 function now
 #
 # Prints a timestamp intended for messages. Precision is nanoseconds,
 # this may change for portability in a future.
@@ -151,7 +131,7 @@ http_options="-s $http_headers $http_url"
 #cut#
 now () { date +'%Y-%m-%d %H:%M:%S.%N'; }
 
-#doc#3 FUNCTION log
+#doc#3 function log
 #
 # Dispatchs a message to the log.
 #
@@ -174,9 +154,9 @@ log () {
     "$(now)" "${USER:+$USER}${SUDO_USER:+"/$SUDO_USER"}" "$msg" >> "$log_file";
 }
 
-#doc#3 FUNCTION log
+#doc#3 function assert
 #
-# FUNCTION assert - finishes a step as [DONE].
+# Finishes a step as [DONE].
 #
 #     USAGE
 #       assert MSG
@@ -189,7 +169,7 @@ assert () {
   log "DONE $*"
 }
 
-#doc#3 FUNCTION error
+#doc#3 function error
 #
 # Triggers an ERROR with the given message..
 #
@@ -205,7 +185,7 @@ error () {
   log "ERROR $*"
 }
 
-#doc#3 FUNCTION die
+#doc#3 function die
 #
 # Triggers a fatal ERROR, finishing the execution.
 #
@@ -218,7 +198,7 @@ die () {
   exit 1
 }
 
-#doc#3 FUNCTION info
+#doc#3 function info
 #
 # Dispatch a INFO message.
 #
@@ -249,7 +229,7 @@ report () {
   log "CHANGE $*"
 }
 
-#doc#3 FUNCTION cmd
+#doc#3 function cmd
 #
 # Runs the given command, unless we're in TRIAL mode (-t).
 #
@@ -274,7 +254,7 @@ cmd () {
   fi
 }
 
-#doc#3 FUNCTION dir_is_empty
+#doc#3 function dir_is_empty
 #
 # True if the given dir is empty.
 #
@@ -295,7 +275,7 @@ dir_is_empty () {
 #
 # Functions related to change detection notifications.
 #
-#doc#3 FUNCTION notify
+#doc#3 function notify
 #
 # Triggers the notification of the current run.
 #
@@ -310,7 +290,7 @@ notify () {
   [ "$notify_enabled" = 1 ] && notify=1 || notify=0
 }
 
-#doc#3 FUNCTION notify_run
+#doc#3 function notify_run
 #
 #  Function to trigger notifications at the EXIT trap
 #
@@ -340,7 +320,7 @@ notify_run () {
 #
 # Functions related to change detection notifications.
 #
-#doc#3 FUNCTION rollback_path
+#doc#3 function rollback_path
 #
 # Save modified files and directories.
 #
@@ -377,7 +357,7 @@ rollback_path () {
   fi
 }
 
-#doc#3 FUNCTION rollback_cmd
+#doc#3 function rollback_cmd
 #
 # Function used to save modified steps.
 #
@@ -416,7 +396,7 @@ rollback_cmd () {
   fi
 }
 
-#doc#3 FUNCTION undo_last_files
+#doc#3 function undo_last_files
 #
 # Rollback the last filesystem changeset
 #
@@ -432,7 +412,7 @@ undo_last_files () {
   done
 }
 
-#doc#3 FUNCTION undo_last_commands
+#doc#3 function undo_last_commands
 #
 # Rollback the last commands changeset
 #
@@ -448,7 +428,7 @@ undo_last_commands () {
   fi
 }
 
-#doc#3 FUNCTION undo_last_changes
+#doc#3 function undo_last_changes
 #
 # Generic rollback invocation
 #
@@ -467,7 +447,7 @@ undo_last_changes () {
 #
 # Functions related to file and directory manipulations
 #
-#doc#3 FUNCTION permissions
+#doc#3 function permissions
 #
 # Sets the given permissions on a file.
 #
@@ -535,7 +515,7 @@ EOF
   fi
 }
 
-#doc#3 FUNCTION directory
+#doc#3 function directory
 #
 # Ensures a directory
 #
@@ -628,7 +608,7 @@ directory () {
   fi
 }
 
-#doc#3 FUNCTION file
+#doc#3 function file
 #
 # Ensures a file from op files
 #
@@ -738,7 +718,7 @@ file () {
 #
 # Functions related to package management.
 #
-#doc#3 FUNCTION pkg
+#doc#3 function pkg
 #
 # Ensure given (debian) packages status
 #
@@ -833,7 +813,7 @@ pkg () {
   fi
 }
 
-#doc#3 FUNCTION aptkey
+#doc#3 function aptkey
 #
 # Ensure an apt key
 #
@@ -883,7 +863,7 @@ aptkey () {
 #
 # Functions related to system users and groups
 #
-#doc#3 FUNCTION group
+#doc#3 function group
 #
 # Ensure a system group
 #
@@ -985,14 +965,14 @@ EOF
   esac
 }
 
-#doc#3 FUNCTION user
+#doc#3 function user
 #
 # Ensure the given user configuration
 #
 # TO-DO Rreview and add more options.
 #
 #     USAGE
-#       user name oper groups oper,wheel pass 'PLAINTEXT'
+#       user name oper groups oper,wheel shell /bin/bash pass 'PLAINTEXT'
 #       user name oper ensure absent
 #
 #cut#
@@ -1071,7 +1051,7 @@ critical () { echo "CRITICAL- $*"; exit 2; }
 unknown () {  echo "UNKNOWN- $*";  exit 3; }
 
 
-#doc#3 FUNCTION doc
+#doc#3 function doc
 #
 # Query and extract the nested documentation.
 #
@@ -1080,8 +1060,8 @@ unknown () {  echo "UNKNOWN- $*";  exit 3; }
 #
 #     EXAMPLES
 #       doc topics        # List them all
-#       doc FUNCTION      # Request all topics matching FUNCTION
-#       doc FUNCTION doc  # Show this help
+#       doc function      # Request all topics matching function
+#       doc function doc  # Show this help
 #cut#
 doc () {
 
@@ -1150,7 +1130,7 @@ doc () {
   printf -- '%s\n' "$result"
 }
 
-#doc#3 FUNCTION doc_title
+#doc#3 function doc_title
 #
 # Create a markdown title of the given level (1 to 6)
 #
@@ -1172,7 +1152,7 @@ doc_title () {
   esac
 }
 
-#doc#3 FUNCTION run_op_init
+#doc#3 function run_op_init
 #
 # This is an internal function, to initialize runs.
 #
@@ -1225,7 +1205,7 @@ run_op_init () {
   fi
 }
 
-#doc#3 FUNCTION run_op
+#doc#3 function run_op
 #
 # This is an internal function, to launch operations or requests.
 #
@@ -1265,7 +1245,7 @@ run_op () {
   fi
 }
 
-#doc#3 FUNCTION import_path
+#doc#3 function import_path
 #
 # Imports the given path to the op ```./files/``` tree.
 #
@@ -1296,7 +1276,7 @@ import_path () {
   fi
 }
 
-#doc#3 FUNCTION op_help
+#doc#3 function op_help
 #
 # Prints the ```op``` help message and exits the program.
 #
@@ -1462,13 +1442,29 @@ done
 op_default="${op_default:-all}"
 run_op
 
-#doc#3 SEE ALSO
+#doc#3 See also
 #
 # See the project page at: http://1n1.github.io/op/
 #
 # And the source repository at: https://github.com/1n1/op
 #
-# Happy operations!
+#doc#2 License
+#
+#     Copyright (C) 2015, Iñigo Tejedor Arrondo <http://inigo.me/>
+#
+#     All rights reserved.
+#
+#     Permission to use, copy, modify, and/or distribute this software for any
+#     purpose with or without fee is hereby granted, provided that the above
+#     copyright notice and this permission notice appear in all copies.
+#
+#     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+#     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+#     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 #cut#
 
