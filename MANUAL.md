@@ -345,6 +345,24 @@ The given argument, should be an **absolute** path.
     USAGE
       import_path PATH
 
+###  function gen
+
+Given a path, generates ```op``` rules for that files to STDOUT
+
+If a second parameter of ```-p```, ```-perms```, ```--perms```, ```perms```,
+is given, then will generate rules only for permisions (not for content).
+
+The firs level will be removed in the case of paths starting by ```files/```.
+
+Use with common sense, only for normal files (config files, aplication
+files) and directories.
+
+Not tested against special files (links, devices, sockets, etc).
+
+    USAGE
+      gen files/etc/newtree    # generate rules for file()
+      gen /usr/bin --perms     # generate rules for permissions()
+
 ###  function op_help
 
 Prints the ```op``` help message and exits the program.
