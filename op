@@ -1327,64 +1327,37 @@ gen () {
 EOF
 }
 
-#doc#3 function op_help
+
+#doc#3 HELP
 #
-# Prints the ```op``` help message and exits the program.
-#
-# If a numeric argument is given, exits with that status.
-#
-# If more arguments ar given, print them before the help meassage.
-#
-#     USAGE
-#       ophelp
-#       >&2 op_help 4 "Exiting with error 4"
+#     op - the operations tool
+#   
+#     USAGE:
+#       op COMMAND [ARGUMENTS]
+#   
+#     COMMANDS:
+#       play NAME ............. Play only NAME. See 'play list'.
+#       request NAME [ARGS] ... Runs a parametrized request. See 'request list'
+#       trial ................. Trial mode (do not apply any change)
+#       gen PATH [--perms] .... Print file rules for given path, or perms with -p
+#       import PATH ........... Imports a given path, into the op tree
+#       undo .................. Rollback steps, and restore the modified files
+#       doc [topics|TOPIC] .... Show detailed documentation, and exit
+#       help .................. Show this help message, and exit
+#   
+#     Sort format (-o) or long format (--op) as well as words (op) are valid.
+#   
+#     EXAMPLES
+#       op --play --list
+#       op play stack-network trial verbose
+#       op -p stack-network
+#       op undo
+#       op -v --request typeA param1 param2
+#       op import /etc/hosts
+#       op --gen /etc/network --perms
 #
 #cut#
-op_help () {
 
-  local status=$?
-
-  case $# in
-    0) status=$status ;;
-    1) status=$1 ;;
-    *) status=$1; shift; printf >&2 "${red}\n %s\n${normal}" "$*" ;;
-  esac
-
-  echo "
-  $op ${blue}v$version $normal <https://inigo.me>
-
-
-  ${green}USAGE:$normal
-    $op COMMAND [ARGUMENTS]
-
-  ${green}COMMANDS:$normal
-    op OP  ................ Run only OP. By default all ops run. See 'op list'
-    request NAME [ARGS] ... Runs a parametrized request. See 'request list'
-    trial ................. Trial mode (do not apply any change)
-    gen PATH [--perms] .... Print file rules for given path, or perms with -p
-    import PATH ........... Imports a given path, into the op tree
-    undo .................. Rollback steps, and restore the modified files
-    doc [topics|TOPIC] .... Show detailed documentation, and exit
-    help .................. Show this help message, and exit
-
-    Sort format (-o) or long format (--op) as well as words (op) are valid.
-
-  ${green}EXAMPLES$normal
-    $op
-    $op op stack trial
-    $op -o stack
-    $op undo
-    $op -v --request typeA param1 param2
-    $op trial import /etc/hosts
-    $op gen /etc/network --perms
-
-"
-  exit "$status"
-}
-
-#
-# Parse the command line arguments
-#
 while [ $# -gt 0 ]; do
   case $1 in
     -o|--op|op)
@@ -1415,7 +1388,7 @@ while [ $# -gt 0 ]; do
           exit 1
         fi
       else
-        >&2 op_help 1
+        die "$( doc HELP )"
       fi
     ;;
     -r|--request|request)
@@ -1442,10 +1415,10 @@ while [ $# -gt 0 ]; do
           for i in $work_dir/requests/*; do
             printf '%s\n' "${i##$work_dir/requests/}"
           done
-          >&2 op_help 1
+          die "$( doc HELP )"
         fi
       else
-        >&2 op_help 1
+        die "$( doc HELP )"
       fi
     ;;
     -g|--gen|gen)
@@ -1457,7 +1430,7 @@ while [ $# -gt 0 ]; do
       if [ "$#" -eq 2 ]; then
         import_path "$2"
       else
-        >&2 op_help 1
+        die "$( doc HELP )"
       fi
       exit
     ;;
@@ -1489,10 +1462,12 @@ while [ $# -gt 0 ]; do
       exit $?
     ;;
     -h|--help|help)
-      op_help 0
+      doc HELP
+      exit
     ;;
     *)
-      op_help 1 "Unknown argument: $1"
+      error "Unknown argument: $1"
+      die "$( doc HELP )"
     ;;
   esac
 done
