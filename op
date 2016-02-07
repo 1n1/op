@@ -1269,6 +1269,64 @@ import_path () {
   fi
 }
 
+
+#doc#3 function gen
+#
+# Given a path, generates ```op``` rules for that files to STDOUT
+#
+# If a second parameter of ```-p```, ```-perms```, ```--perms```, ```perms```,
+# is given, then will generate rules only for permisions (not for content).
+#
+# The firs level will be removed in the case of paths starting by ```files/```.
+#
+# Use with common sense, only for normal files (config files, aplication
+# files) and directories.
+#
+# Not tested against special files (links, devices, sockets, etc).
+#
+#     USAGE
+#       gen files/etc/newtree    # generate rules for file()
+#       gen /usr/bin --perms     # generate rules for permissions()
+#
+#cut#
+gen () {
+
+  local path
+  local p=0
+
+  while [ "$#" -gt 0 ]; do
+    case $1 in
+      '') >&2 op_help 1 ;;
+      -p|-perms|--perms|perms|permissions) p=1; shift ;;
+      *)
+        if [ -d "$1" ] || [ -f "$1" ]; then
+          path=$1
+          shift
+        else
+          die "Not a valid path in the current filesystem: $1"
+        fi
+      ;;
+    esac
+  done
+
+  [ -e "$path" ] || >&2 op_help 1
+
+  local o g m n
+  while read -r o g m n; do
+    if [ -d "$n" ]; then
+      printf "directory -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
+    elif [ -f "$n" ]; then
+      if [ "$p" -eq 0 ]; then
+        printf "file -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
+      else
+        printf "permissions -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
+      fi
+    fi
+  done <<EOF
+    $( find "$path" -printf '%u %g %m %p\n' )
+EOF
+}
+
 #doc#3 function op_help
 #
 # Prints the ```op``` help message and exits the program.
@@ -1303,6 +1361,7 @@ op_help () {
     op OP  ................ Run only OP. By default all ops run. See 'op list'
     request NAME [ARGS] ... Runs a parametrized request. See 'request list'
     trial ................. Trial mode (do not apply any change)
+    gen PATH [--perms] .... Print file rules for given path, or perms with -p
     import PATH ........... Imports a given path, into the op tree
     undo .................. Rollback steps, and restore the modified files
     doc [topics|TOPIC] .... Show detailed documentation, and exit
@@ -1317,6 +1376,7 @@ op_help () {
     $op undo
     $op -v --request typeA param1 param2
     $op trial import /etc/hosts
+    $op gen /etc/network --perms
 
 "
   exit "$status"
@@ -1387,6 +1447,11 @@ while [ $# -gt 0 ]; do
       else
         >&2 op_help 1
       fi
+    ;;
+    -g|--gen|gen)
+      shift
+      gen "$@"
+      exit
     ;;
     -i|--import|import)
       if [ "$#" -eq 2 ]; then
