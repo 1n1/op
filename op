@@ -478,16 +478,9 @@ permissions () {
   # Obtain current values
   #
   read -r owner group mode <<EOF
-  $(
-    if [ -r "$item" ]; then
-      stat -c '%U %G %a' -- "$item"
-    else
-      if [ "$trial" != 0 ]; then
-        printf "%s " trial 666 trial 666 trial 000
-      fi
-    fi
-  )
+$( stat -c '%U %G %a' -- "$item")
 EOF
+
   mode="$( printf '%04i' "$mode"; )"
 
   #
