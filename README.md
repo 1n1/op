@@ -72,7 +72,7 @@ To hint the usage at any time in the command line, use ```op help```:
         gen PATH [--perms] .... Print file rules for given path, or perms with -p
         import PATH ........... Imports a given path, into the op tree
         undo .................. Rollback steps, and restore the modified files
-        doc [topics|TOPIC] .... Show detailed documentation, and exit
+        doc FILE [topics|TOPIC] Show detailed documentation, and exit
         help .................. Show this help message, and exit
       
       Sort format (-p) or long format (--play) as well as words (play) are valid.
@@ -85,6 +85,7 @@ To hint the usage at any time in the command line, use ```op help```:
         op -v --request typeA param1 param2
         op import /etc/hosts
         op --gen /etc/network --perms
+        op --doc op function log
 
 ## Reference manual
 
@@ -95,14 +96,18 @@ You can access the same information at any time, from the command line, using
 the ```--doc``` switch:
 
      op --doc
-     op --doc topics
-     op --doc function log
+     op --doc op topics
+     op --doc op function log
 
+The ```--doc``` switch also work with your definitions, so you can generate
+markdown from comments on code:
+
+     op doc play/mystack | markdown
 
 ## Contributing
 
 See the
-[contributing guide](https://github.com/1n1/op/blob/master/CONTRIBUTING.md)
+[contributing guide](https://github.com/1n1/op/blob/master/CONTRIBUTING.md).
 
 
 ## License

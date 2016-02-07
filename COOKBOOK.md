@@ -58,7 +58,7 @@ To refresh your memory about ```op``` options, you can call ```op -h```
         gen PATH [--perms] .... Print file rules for given path, or perms with -p
         import PATH ........... Imports a given path, into the op tree
         undo .................. Rollback steps, and restore the modified files
-        doc [topics|TOPIC] .... Show detailed documentation, and exit
+        doc FILE [topics|TOPIC] Show detailed documentation, and exit
         help .................. Show this help message, and exit
       
       Sort format (-p) or long format (--play) as well as words (play) are valid.
@@ -71,6 +71,7 @@ To refresh your memory about ```op``` options, you can call ```op -h```
         op -v --request typeA param1 param2
         op import /etc/hosts
         op --gen /etc/network --perms
+        op --doc op function log
 
 Parametrized requests pass the parameters at the end of the CLI invocation.
 
@@ -103,9 +104,25 @@ new one:
     vim play/base
 
 You could use the op function: ```file```, to ease logging, repeatability
-and rollbacks:
+and rollbacks, example content for the recipe:
 
-    echo 'file -n /etc/fstab -o root -g root -m 644' >> play/base
+    #doc#1 play/base
+    #
+    # Basic system definitions
+    #
+    #cut#
+    
+    info "Starting base definitions"
+    
+    #doc#2 /etc/fstab
+    #
+    # Ensure that partitions are mounted and use noatime.
+    #
+    #cut#
+    info "Setting up noatime"
+    file -n /etc/fstab -o root -g root -m 644 -t 'mount -o remount -a'
+    
+    info "Finished the base definitions"
 
 Then you can test your changes before apply them:
 
@@ -114,6 +131,10 @@ Then you can test your changes before apply them:
 If everything looks ok, go ahead:
 
     op play base
+
+If in a future, yo do not remeber what the file did, try ```--doc``` on it:
+
+    op doc play/base
 
 ### Workflow of a parametrized request
 

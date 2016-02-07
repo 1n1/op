@@ -1,20 +1,18 @@
 
 #  op - *The* operations tool
 
-This program, aims to ease systems definition and maintenance.
-
-For more information, see: https://github.com/1n1/op
+This program, helps to make systems definitions **reproducible** and to
+help on system's maintenance and discovery.
 
 ##  Initialization
 
-When you call ```op``` without arguments, it sources all operations stored
+When you call ```op``` without arguments, it sources all definitions stored
 in a relative subdirectory from the invocation dir, under ```./play/*```.
 
-Those sourced operations, can reuse this program variables and functions.
+Those sourced operations, can reuse the ```op``` variables and functions.
 
 There are switches to call specific ```./play/``` files (```-p```) and
-specific requests under ```./requests/``` with (```-r```). We will reference
-those custom files as "recipes" from now on.
+specific requests under ```./requests/``` with (```-r```). 
 
 By default we're quiet, with the program output. Use ```-v``` to see verbose
 messages.
@@ -22,7 +20,7 @@ messages.
 Use ```--trial``` on the command line, for test without applying commands.
 
 The modes ```-e``` and ```-u```, are set at initialization, recipes will be
-affected by such behavior.
+affected by such behavior, as they are sourced.
 
 ##  Program variables
 
@@ -47,10 +45,7 @@ The following foreground color variables, are initialized for reusing:
     normal, red, green, yellow, blue, magenta, cyan, white
 ###  Logging variables
 
-Each run, gets a uniq identifier, stored in the variable: ```run_id```
-
-This is used to manage the symlinks, to the latest log and the latest
-rollback directories.
+Each run gets a uniq identifier, stored in the variable: ```run_id```
 
 The variables ```logs``` and ```logfile``` will point to our current
 log during execution. For internal use.
@@ -62,7 +57,6 @@ Notifications are controlled by the boolean: ```notify_enabled```
 
 Set to 1 to notify run results, set to 0 to disable notifications.
 
-We start counting, like if there were no changes or errors...
 HTTP notifications are configured using:
 
 ```http_url```: URL to use for the request
@@ -73,12 +67,11 @@ Use ```http_options``` to tune any extra curl option you may need.
 
 ##  General purpose functions
 
-Functions for Output, messages and general purpose
+Functions for output, messages and general purpose
 
 ###  function now
 
-Prints a timestamp intended for messages. Precision is nanoseconds,
-this may change for portability in a future.
+Prints a timestamp intended for messages.
 
 No arguments.
 
@@ -87,25 +80,26 @@ No arguments.
 
 ###  function log
 
-Dispatchs a message to the log.
+Dispatchs a message to the log file.
 
-In the process, colors are remved from the message.
+In the process, colors are removed from the message.
 
     USAGE
       log MSG
 
 ###  function assert
 
-Finishes a step as [DONE].
+Finish a step as [DONE].
 
     USAGE
       assert MSG
 
 ###  function error
 
-Triggers an ERROR with the given message..
+Triggers an ERROR with the given message.
 
-Errors trigger notifications if they are enabled. Do not stop execution.
+Errors trigger notifications, if they are enabled, but do no not stop
+the execution.
 
     USAGE
       error MSG
@@ -119,62 +113,64 @@ Triggers a fatal ERROR, finishing the execution.
 
 ###  function info
 
-Dispatch a INFO message.
+Dispatch an INFO message.
 
     USAGE
       info MSG
 
-###  FUNTION report
+###  function report
 
 Reports a CHANGE.
 
-Runs with changes are notified (if enabled).
+Any CHANGE will trigger a notification of the run log, if notifications are
+enabled.
 
     USAGE
       report MSG
 
 ###  function cmd
 
-Runs the given command, unless we're in TRIAL mode (-t).
+Runs the given command, unless we're in TRIAL mode (```-t```).
 
-Prefix cp, rm, mv. find, etc commands with 'cmd ' in front of them.
+Prefix your cp, rm, mv. find, etc commands with 'cmd ' in front of them.
 
     USAGE
       cmd CMD ARG1 ARG2
 
 ###  function dir_is_empty
 
-True if the given dir is empty.
+True if the given DIR is empty.
 
     USAGE
       dir_is_empty DIR
 
 ##  Notification functions
 
-Functions related to change detection notifications.
+Functions related to notifications.
 
 ###  function notify
 
-Triggers the notification of the current run.
+Triggers the notification of the current run log.
 
-Notifications are send from an EXIT trap. This function, will trigger
-them if they are enabled:
+Notifications are send from an EXIT trap.
+
+This function, will trigger there are changes.
 
     USAGE
       notify
 
 ###  function notify_run
 
- Function to trigger notifications at the EXIT trap
+Function to trigger notifications at the EXIT trap.
 
-No arguments required.
+No arguments required. Internal use.
 
     USAGE
       notify_run
 
 ##  Rolling back functions
 
-Functions related to change detection notifications.
+Functions related to saving rollbacks.
 
 ###  function rollback_path
 
@@ -189,19 +185,19 @@ See undo_last_changes too.
 
 Function used to save modified steps.
 
-Usually you register a command to do the opposite than the previous or
+Usually you register a command, to do the opposite than the previous or
 the next command.
 
 See undo_last_changes too.
 
     USAGE
-      rollback_cmd mycommand --to-do-the-opossite-step
+      rollback_cmd COMMAND ARGS
 
 ###  function undo_last_files
 
 Rollback the last filesystem changeset
 
-Well, really print the files found, fixme.
+Well, really print the files found, FIXME.
 
     USAGE
       undo_last_files
@@ -210,7 +206,7 @@ Well, really print the files found, fixme.
 
 Rollback the last commands changeset
 
-Well, really print the code that should run, fixme.
+Well, really print the code that should run, FIXME.
 
     USAGE
       undo_last_commands
@@ -226,7 +222,7 @@ Important: The filesystem is restored first, and the commands run after.
 
 ##  File functions
 
-Functions related to file and directory manipulations
+Functions related to file and directory definitions
 
 ###  function permissions
 
@@ -243,11 +239,11 @@ The content is ignored. Argument order matters.
 
 ###  function directory
 
-Ensures a directory
+Ensures a directory definition
 
     USAGE
       directory -n /path/to/dir -o root -g root -m 700
-      directory name /path/to/dir ensure absent
+      directory name /path/to/dir ensure absent --trigger notify
 
 ###  function file
 
@@ -255,7 +251,7 @@ Ensures a file from op files
 
     USAGE
      file -n /path/to/file -o root -g root -m 400 -t "echo trigger command"
-     file -n /path/to/file -e absent
+     file -n /path/to/file -e absent --trigger '/root/myscript.sh'
 
 ##  Package management functions
 
@@ -270,13 +266,13 @@ Argument order matters, first the orders, last the packages.
     USAGE
       pkg present pkg1 pkg2
       pkg absent pkg1 pkg2
-      pkg trigger whatever absent pkg1
+      pkg trigger auditscript.sh absent pkg1
 
 ###  function aptkey
 
 Ensure an apt key
 
-FIXME needs review, works for my usage, rollback maybe broken
+Works for my usage, rollback maybe broken. FIXME
 
     USAGE
       aptkey present /path/to/filename.key  # ex: nginx_signing.key
@@ -284,7 +280,7 @@ FIXME needs review, works for my usage, rollback maybe broken
 
 ##  Users and groups functions
 
-Functions related to system users and groups
+Functions related to system users and groups.
 
 ###  function group
 
@@ -298,8 +294,6 @@ Ensure a system group
 
 Ensure the given user configuration
 
-TO-DO Rreview and add more options.
-
     USAGE
       user name oper groups oper,wheel shell /bin/bash pass 'PLAINTEXT'
       user name oper ensure absent
@@ -309,12 +303,13 @@ TO-DO Rreview and add more options.
 Query and extract the nested documentation.
 
     USAGE
-      doc [topics|TOPIC]
+      doc FILE [topics|TOPIC]
 
     EXAMPLES
-      doc topics        # List them all
-      doc function      # Request all topics matching function
-      doc function doc  # Show this help
+      doc play/stage1 topics     # List them all
+      doc op function            # Request all topics matching 'function'
+      doc op function doc        # Show this help message
+
 ###  function doc_title
 
 Create a markdown title of the given level (1 to 6)
@@ -363,7 +358,7 @@ Not tested against special files (links, devices, sockets, etc).
       gen files/etc/newtree    # generate rules for file()
       gen /usr/bin --perms     # generate rules for permissions()
 
-###  HELP
+###  help
 
     op - the operations tool
 
@@ -377,7 +372,7 @@ Not tested against special files (links, devices, sockets, etc).
       gen PATH [--perms] .... Print file rules for given path, or perms with -p
       import PATH ........... Imports a given path, into the op tree
       undo .................. Rollback steps, and restore the modified files
-      doc [topics|TOPIC] .... Show detailed documentation, and exit
+      doc FILE [topics|NAME]  Show detailed documentation, and exit
       help .................. Show this help message, and exit
 
     Sort format (-p) or long format (--play) as well as words (play) are valid.
@@ -390,6 +385,7 @@ Not tested against special files (links, devices, sockets, etc).
       op -v --request typeA param1 param2
       op import /etc/hosts
       op --gen /etc/network --perms
+      op --doc op function log
 
 ###  See also
 
