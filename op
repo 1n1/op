@@ -9,11 +9,11 @@
 #doc#2 Initialization
 #
 # When you call ```op``` without arguments, it sources all operations stored
-# in a relative subdirectory from the invocation dir, under ```./ops/*```.
+# in a relative subdirectory from the invocation dir, under ```./play/*```.
 #
 # Those sourced operations, can reuse this program variables and functions.
 #
-# There are switches to call specific ```./ops/``` files (```-o```) and
+# There are switches to call specific ```./play/``` files (```-p```) and
 # specific requests under ```./requests/``` with (```-r```). We will reference
 # those custom files as "recipes" from now on.
 #
@@ -1168,8 +1168,8 @@ run_op_init () {
     info "Running as plain user, some operations may require higher privileges."
   fi
 
-  [ -d "$work_dir/ops" ] || die "You need to define some operations first."
-  [ "$( echo "$work_dir"/ops/* )" ] || die "You need to define some operations first."
+  [ -d "$work_dir/play" ] || die "You need to define some operations first."
+  [ "$( echo "$work_dir"/play/* )" ] || die "You need to define some operations first."
 
   #
   # Block parallel runs from ourself
@@ -1213,13 +1213,13 @@ run_op () {
   # If no operation is given run them all.
   #
   if [ "$op_default" = all ]; then
-    if dir_is_empty "$work_dir/ops"; then
+    if dir_is_empty "$work_dir/play"; then
       die "You need to define some operations to run."
     else
       # syntax check all operation files
-      for f in "$work_dir/ops/"*; do sh -n "$f" || exit; done
+      for f in "$work_dir/play/"*; do sh -n "$f" || exit; done
       # and source them all
-      for f in "$work_dir/ops/"*; do . "$f"; done
+      for f in "$work_dir/play/"*; do . "$f"; done
       exit
     fi
   # Or if some specific operation is given, run only that one.
@@ -1345,7 +1345,7 @@ EOF
 #       doc [topics|TOPIC] .... Show detailed documentation, and exit
 #       help .................. Show this help message, and exit
 #   
-#     Sort format (-o) or long format (--op) as well as words (op) are valid.
+#     Sort format (-p) or long format (--play) as well as words (play) are valid.
 #   
 #     EXAMPLES
 #       op --play --list
@@ -1360,11 +1360,11 @@ EOF
 
 while [ $# -gt 0 ]; do
   case $1 in
-    -o|--op|op)
+    -p|--play|play)
       case $* in
         (*'list'*|*'-l'*|*'--list'*)
-          for i in "$work_dir"/ops/*; do
-            printf '%s\n' "${i##$work_dir/ops/}"
+          for i in "$work_dir"/play/*; do
+            printf '%s\n' "${i##$work_dir/play/}"
           done
           exit
         ;;
@@ -1373,8 +1373,8 @@ while [ $# -gt 0 ]; do
         ;;
       esac
       if [ "$#" -ge 2 ]; then
-        if [ -e "$work_dir/ops/$2" ]; then
-          op_default="$work_dir/ops/$2"
+        if [ -e "$work_dir/play/$2" ]; then
+          op_default="$work_dir/play/$2"
           shift 2
         elif [ "$2" = all ]; then
           op_default="all"
@@ -1382,8 +1382,8 @@ while [ $# -gt 0 ]; do
         else
           error "Unknown operation type: $2"
           error "List of known operations:"
-          for i in "$work_dir"/ops/*; do
-            printf ' %s\n' "${i##$work_dir/ops/}" >&2
+          for i in "$work_dir"/play/*; do
+            printf ' %s\n' "${i##$work_dir/play/}" >&2
           done
           exit 1
         fi

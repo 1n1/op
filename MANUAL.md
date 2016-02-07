@@ -8,11 +8,11 @@ For more information, see: https://github.com/1n1/op
 ##  Initialization
 
 When you call ```op``` without arguments, it sources all operations stored
-in a relative subdirectory from the invocation dir, under ```./ops/*```.
+in a relative subdirectory from the invocation dir, under ```./play/*```.
 
 Those sourced operations, can reuse this program variables and functions.
 
-There are switches to call specific ```./ops/``` files (```-o```) and
+There are switches to call specific ```./play/``` files (```-p```) and
 specific requests under ```./requests/``` with (```-r```). We will reference
 those custom files as "recipes" from now on.
 
@@ -363,17 +363,33 @@ Not tested against special files (links, devices, sockets, etc).
       gen files/etc/newtree    # generate rules for file()
       gen /usr/bin --perms     # generate rules for permissions()
 
-###  function op_help
+###  HELP
 
-Prints the ```op``` help message and exits the program.
+    op - the operations tool
 
-If a numeric argument is given, exits with that status.
+    USAGE:
+      op COMMAND [ARGUMENTS]
 
-If more arguments ar given, print them before the help meassage.
+    COMMANDS:
+      play NAME ............. Play only NAME. See 'play list'.
+      request NAME [ARGS] ... Runs a parametrized request. See 'request list'
+      trial ................. Trial mode (do not apply any change)
+      gen PATH [--perms] .... Print file rules for given path, or perms with -p
+      import PATH ........... Imports a given path, into the op tree
+      undo .................. Rollback steps, and restore the modified files
+      doc [topics|TOPIC] .... Show detailed documentation, and exit
+      help .................. Show this help message, and exit
 
-    USAGE
-      ophelp
-      >&2 op_help 4 "Exiting with error 4"
+    Sort format (-p) or long format (--play) as well as words (play) are valid.
+
+    EXAMPLES
+      op --play --list
+      op play stack-network trial verbose
+      op -p stack-network
+      op undo
+      op -v --request typeA param1 param2
+      op import /etc/hosts
+      op --gen /etc/network --perms
 
 ###  See also
 
