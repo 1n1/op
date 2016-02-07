@@ -51,6 +51,8 @@ In the future there will be better ways, by now you can run:
 From this point, any system user will be able to run ```op``` and ```op doc```,
 and you're done to start creating or reusing definitions.
 
+Always you can download [archived releases](https://github.com/1n1/op/releases).
+
 
 ## Usage
 
