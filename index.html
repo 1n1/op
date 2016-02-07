@@ -1,1 +1,301 @@
-<h1>op</h1>
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+ <meta charset="utf-8">
+ <title>op - The operations tool</title>
+  <style type="text/css">
+   html, body {
+     margin:0; 
+     padding:0; 
+     color:#464646;
+     font-family: Helvetica, Arial, sans-serif; 
+     font-size:19px;
+     background: #f7f7f7;
+     background: -moz-linear-gradient(top, #f7f7f7 0%, #dedede 100%);
+     background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#f7f7f7), color-stop(100%,#dedede));
+     background: -webkit-linear-gradient(top, #f7f7f7 0%,#dedede 100%);
+     background: -o-linear-gradient(top, #f7f7f7 0%,#dedede 100%);
+     background: -ms-linear-gradient(top, #f7f7f7 0%,#dedede 100%);
+     filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#f7f7f7', endColorstr='#dedede',GradientType=0 );
+     background: linear-gradient(top, #f7f7f7 0%,#dedede 100%);
+   }
+   img{border-style:none;}
+   #wrapper {
+     max-width:1280px;
+     width: 96%;
+     margin:0 auto;
+   }
+   #north {
+     background:#f6f6f6;
+     color:#aaa;
+     border-bottom: 1px solid #ccc;
+     font-family: Monaco, Monospace, serif;
+   }
+   #north h1 {
+     font-size: 2.2em;
+     /*font-family: 'DejaVu Sans','Bitstream Vera Sans',Verdana,sans-serif;*/
+     margin-top: 0;
+     color: #444;
+     text-shadow: -1px -1px 1px #aaa;
+     filter: dropshadow(color=#aaa, offx=1, offy=1);
+   }
+   #north p { color: green; font-size: 1.2em;}
+   #center {
+     clear:left;
+     display:block;
+     margin-right:230px;
+     padding: 0 4em 0 0;
+   }
+#center pre, #center code {
+  font-family: Monaco, Monospace, serif;
+  font-size:0.9em;
+}
+#center p {
+     text-align: justify;
+}
+#center p code {
+  padding:0 0.3em;
+  color: darkgreen;
+  /*font-weight: bold; */
+  /*text-shadow: -1px -1px 1px #a40000;
+  filter: dropshadow(color=#a40000, offx=1, offy=1); */
+ }
+#center pre {
+  background-color: #fff;  
+  color: #262626;
+border-width:1px;
+border-color:#858585;
+-moz-border-radius:2px;
+-webkit-border-radius:2px;
+border-radius:2px;
+-moz-box-shadow:0px 0px 12px 1px #818181;
+-webkit-box-shadow:0px 0px 12px 1px #818181;
+box-shadow:0px 0px 12px 1px #818181;
+  margin: 2em 3em 3em 3em;
+  padding: 1em 1.2em;
+  max-width:78%;
+  line-height: 1.12em;
+}
+#center pre .bash {
+  background-color: #fff;  
+  color: #161616;
+}
+
+# center h2 {
+  margin:30px 5px 5px 5px;
+}
+
+h2 {
+  font-size: 1.8em;
+  font-family: Monaco, 'DejaVu Sans','Bitstream Vera Sans',Verdana,sans-serif;
+  color: green;
+}
+h3 {
+  font-size: 1.3em;
+  margin:20px 5px 0px 5px;
+  font-family: Monaco, 'DejaVu Sans','Bitstream Vera Sans',Verdana,sans-serif;
+  color: gray;
+}
+
+h2, h3 {
+  text-shadow: -1px -1px 1px #999;
+  filter: dropshadow(color=#999, offx=1, offy=1);
+  border-bottom: 1px solid #ccc;
+}
+
+h2 span, h3 span {
+  color: #0084b4;
+}
+
+
+   #west {
+     font-size: 0.8em;
+     float:right;
+     width:220px;
+     display:block;
+     border-left:1px solid #ccc;
+     padding: 0 0 0 20px;
+   }
+   #west h2 { margin-top: 0;}
+   #south {
+     clear:both;
+   }
+   #header {
+     margin-bottom:10px;
+     max-width:1280px;
+     margin:0 auto;
+     padding:0.5em;
+     letter-spacing: 0.4em;
+   }
+   #header_title h1 { display: inline;}
+   #header_title p { 
+     letter-spacing: 0.1em;
+     display: inline; padding:0 1em; font-style: italic;}
+   #menu {line-height: 2em; margin: 0 0 2em 0;}
+   #menu h2 { padding-bottom: 3px;}
+   #menu li {
+     list-style-type:none;
+     padding-left:0em;
+   }
+   #module_index { text-align: center; font-weight:bold;}
+   #footer {
+     color: #999;
+     font-size:0.9em;
+     text-align:right;
+     line-height:2em;
+     padding:0.2em;
+     margin-top:10px;
+   }
+p {
+  font-size: 1.0em;
+  line-height:1.4em;
+  letter-spacing: 0.12em;
+  padding: 0 5px;
+} 
+a, a:visited {
+  color: #0084b4;
+  text-decoration: none;
+}
+a:hover, a:visited:hover {
+  color: green;
+  text-decoration: none;
+  background: #d7ecd6;
+}
+ </style>
+</head>
+<body>
+  <div id="all">
+   <div id="north">
+    <div id="header">
+     <div id="header_title">
+      <h1>op</h1><p># <em>The</em> operations tool.</p>
+     </div>
+    </div><!-- #header -->
+   </div><!-- #north -->
+   <div id="wrapper">
+    <div id="center">
+
+<h1>op - <em>The</em> operations tool</h1>
+
+<h2>Introduction</h2>
+
+<p>TL;DR: This tool is just a shell wrapper, to ease systems support.</p>
+
+<p><code>op</code> is just a single <code>/bin/sh</code> script.</p>
+
+<p>It expects a directory layout, with definitions inside, and declares a few
+shell functions.</p>
+
+<p>You can <strong>reuse</strong> those functions, to write system definitions and operations,
+in that same directory tree. They, are designed to be <strong>repeatable</strong>.</p>
+
+<p>The <code>op</code> <abbr title="Domain Specific Language">D.S.L.</abbr> functions,
+include <strong>change detection</strong>, <strong>logging</strong> and <strong>rollback</strong> features in their
+implementation. Rollback features are in alpha state.</p>
+
+<p>The change detection feature, includes an optional HTTP <strong>notification mechanism</strong>
+in place, for convenience.</p>
+
+<h2>Why whould I want to use <code>op</code>?</h2>
+
+<p>If you're looking for a framework, to make your systems easier to
+<strong>discover</strong> and <strong>manage</strong>, in <strong>repeatable</strong> ways, using the shell as
+in <code>/bin/sh</code> for the interpreter, you may want to use <code>op</code>.</p>
+
+<p>It's fast, a low dependency chain is required, the learning curve is almost
+null if you know sh scripting, and you can reuse
+<a href="https://github.com/1n1/op-examples">available recipes</a>!.</p>
+
+<p>If you're looking for a <abbr title="Domain Specific Language">DSL</abbr> to
+get to <strong>desired state</strong> on basic system operations (permissions, file,
+directory, package, etc..) <code>op</code> maybe your mod-friendly tool fo choice!</p>
+
+<h2>Installation</h2>
+
+<p>You can install <code>op</code> anywhere in your PATH. It's just a script.</p>
+
+<p>In the future there will be better ways, by now you can run:</p>
+
+<pre><code>wget -q -O op 'https://inigo.me/pub/op/op'
+# less op
+mv op /usr/local/bin/op
+chmod 0755 /usr/local/bin/op
+</code></pre>
+
+<p>From this point, any system user will be able to run <code>op</code> and <code>op doc</code>,
+and you're done to start creating or reusing definitions.</p>
+
+<h2>Usage</h2>
+
+<p>For a guide with examples step by step, check the
+<a href="https://github.com/1n1/op/blob/master/COOKBOOK.md">op cookbook</a></p>
+
+<p>To hint the usage at any time in the command line, use <code>op help</code>:</p>
+
+<pre><code>  op - the operations tool
+
+  USAGE:
+    op COMMAND [ARGUMENTS]
+
+  COMMANDS:
+    play NAME ............. Play only NAME. See 'play list'.
+    request NAME [ARGS] ... Runs a parametrized request. See 'request list'
+    trial ................. Trial mode (do not apply any change)
+    gen PATH [--perms] .... Print file rules for given path, or perms with -p
+    import PATH ........... Imports a given path, into the op tree
+    undo .................. Rollback steps, and restore the modified files
+    doc FILE [topics|TOPIC] Show detailed documentation, and exit
+    help .................. Show this help message, and exit
+
+  Sort format (-p) or long format (--play) as well as words (play) are valid.
+
+  EXAMPLES
+    op --play --list
+    op play stack-network trial verbose
+    op -p stack-network
+    op undo
+    op -v --request typeA param1 param2
+    op import /etc/hosts
+    op --gen /etc/network --perms
+    op --doc op function log
+</code></pre>
+
+<h2>Reference manual</h2>
+
+<p>See the <a href="https://github.com/1n1/op/blob/master/MANUAL.md">op manual</a> online,
+for a complete reference.</p>
+
+<p>You can access the same information at any time, from the command line, using
+the <code>--doc</code> switch:</p>
+
+<pre><code> op --doc
+ op --doc op topics
+ op --doc op function log
+</code></pre>
+
+<p>The <code>--doc</code> switch also work with your definitions, so you can generate
+markdown from comments on code:</p>
+
+<pre><code> op doc play/mystack | markdown
+</code></pre>
+
+<h2>Contributing</h2>
+
+<p>See the
+<a href="https://github.com/1n1/op/blob/master/CONTRIBUTING.md">contributing guide</a>.</p>
+
+<h2>License</h2>
+
+<p>See the MIT style <a href="https://github.com/1n1/op/blob/master/LICENSE">LICENSE</a>,
+included with the source repository.</p>
+     </div><!-- #center -->
+   </div><!-- #wrapper -->
+   <div id="south">
+    <div id="footer">
+    <p>Follow and modify <strong>op</strong> at the <a href="https://github.com/1n1/op" title="op - The operations tool - at github">github repo</a>.</p>   
+    </div><!-- #footer -->
+   </div><!-- #south -->
+  </div><!-- #all -->
+ </body>
+</html>
+
