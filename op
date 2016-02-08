@@ -106,7 +106,7 @@ notify=0    # internal counter, do not edit
 notify_enabled=0
 http_url="https://127.0.0.1/report"
 http_headers="-H 'OP: $version' -H 'RunId: $run_id' -H 'Client: $hostname'"
-http_options="-s $http_headers $http_url"
+http_options="-s $http_headers -- $http_url"
 
 #doc#2 General purpose functions
 #
@@ -141,7 +141,7 @@ log () {
   local yellow=""
   local blue=""
   local magenta=""
-  local msg="$(echo "$*" | sed -r 's/\x1b\[[0-9;]*m?//g')"
+  local msg="$(echo -- "$*" | sed -r 's/\x1b\[[0-9;]*m?//g')"
 
   printf -- '[%s] [%s] %s\n' \
     "$(now)" "${USER:+$USER}${SUDO_USER:+"/$SUDO_USER"}" "$msg" >> "$log_file";
@@ -157,7 +157,7 @@ log () {
 #cut#
 assert () {
   if [ "$verbose" = 1 ]; then
-    printf "$normal[${green}DONE${normal}] %s\n" "$*"
+    printf -- "$normal[${green}DONE${normal}] %s\n" "$*"
   fi
   log "DONE $*"
 }
@@ -175,7 +175,7 @@ assert () {
 #cut#
 error () {
   notify
-  printf "$normal[${red}ERROR${normal}] %s\n" "$*" 2>&1
+  printf -- "$normal[${red}ERROR${normal}] %s\n" "$*" 2>&1
   log "ERROR $*"
 }
 
@@ -202,7 +202,7 @@ die () {
 #cut#
 info () {
   if [ "$verbose" = 1 ]; then
-    printf "$normal[${blue}INFO${normal}] ${blue}%s${normal}\n" "$*"
+    printf -- "$normal[${blue}INFO${normal}] ${blue}%s${normal}\n" "$*"
   fi
   log "INFO $*"
 }
@@ -220,7 +220,7 @@ info () {
 #cut#
 report () {
   notify
-  printf "$normal[${yellow}CHANGE${normal}] %s\n" "$*" || :
+  printf -- "$normal[${yellow}CHANGE${normal}] %s\n" "$*" || :
   log "CHANGE $*"
 }
 
@@ -245,7 +245,7 @@ cmd () {
       log "$line"
     done
   else
-    printf "$normal[${magenta}TRIAL${normal}] %s\n" "$*"
+    printf -- "$normal[${magenta}TRIAL${normal}] %s\n" "$*"
   fi
 }
 
@@ -302,7 +302,7 @@ notify_run () {
     if [ -e "$log_file" ]; then
       if response="$( curl -X POST -d @$log_file $http_options )"; then
         info "Reponse received..."
-        printf '%s\n' "$response" | while read -r line; do info "$line"; done
+        printf -- '%s\n' "$response" | while read -r line; do info "$line"; done
       else
         error "Could not notify, Curl error code: $?"
       fi
@@ -333,21 +333,21 @@ rollback_path () {
 
   if [ -f "$1" ] || [ -d "$1" ]; then
 
-    cmd mkdir -p "$target"
+    cmd mkdir -p -- "$target"
     if [ -L "$rollback_dir/latest" ]; then
 
-      local current="$( readlink $rollback_dir/latest )"
+      local current="$( readlink -- $rollback_dir/latest )"
 
       if [ "X$current" != "X$target" ]; then
-        cmd ln -fns "$rollback_dir/$run_id" "$rollback_dir/latest"
+        cmd ln -fns -- "$rollback_dir/$run_id" "$rollback_dir/latest"
       fi
     else
-      cmd ln -s "$rollback_dir/$run_id" "$rollback_dir/latest"
+      cmd ln -s -- "$rollback_dir/$run_id" "$rollback_dir/latest"
     fi
 
     report "Saving rollback: $file"
-    cmd mkdir -p "$target$( dirname "$file" )"
-    cmd cp -a "$file" "$target$file"
+    cmd mkdir -p -- "$target$( dirname "$file" )"
+    cmd cp -a -- "$file" "$target$file"
   else
     error "Cannot read for rollback: $file"
   fi
@@ -371,24 +371,24 @@ rollback_cmd () {
   local l="$rollback_dir/latest.undo"
   local target="$rollback_dir/${run_id}.undo"
 
-  cmd mkdir -p "$target"
+  cmd mkdir -p -- "$target"
 
   if [ -L "$l" ]; then
 
     local current="$( cmd readlink "$l" )"
 
     if [ "X$current" != "X$target" ]; then
-      cmd ln -fns "$rollback_dir/${run_id}.undo" "$l"1
+      cmd ln -fns -- "$rollback_dir/${run_id}.undo" "$l"1
     fi
   else
-    cmd ln -s "$rollback_dir/${run_id}.undo" "$l"
+    cmd ln -s -- "$rollback_dir/${run_id}.undo" "$l"
   fi
 
   report "Saving rollback: $*"
   if [ "$trial" = 1 ]; then
-    cmd printf '%s\n' "$*" \>\> "$target/steps"
+    cmd printf -- '%s\n' "$*" \>\> "$target/steps"
   else
-    printf '%s\n' "$*" >> "$target/steps"
+    printf -- '%s\n' "$*" >> "$target/steps"
   fi
 }
 
@@ -420,7 +420,7 @@ undo_last_files () {
 #cut#
 undo_last_commands () {
   if [ -e "$rollback_dir/latet.undo/steps" ]; then
-    cat "$rollback_dir/latet.undo/steps"
+    cat -- "$rollback_dir/latet.undo/steps"
   fi
 }
 
@@ -463,7 +463,7 @@ permissions () {
   local item_c="${blue}${item}${normal}"
   local item_owner="$2"
   local item_group="$3"
-  local item_mode="$( printf '%04i' "$4"; )"   # XXX, XXXX
+  local item_mode="$( printf -- '%04i' "$4"; )"   # XXX, XXXX
   local owner=''
   local group=''
   local mode=''
@@ -477,7 +477,7 @@ permissions () {
 $( stat -c '%U %G %a' -- "$item")
 EOF
 
-  mode="$( printf '%04i' "$mode"; )"
+  mode="$( printf -- '%04i' "$mode"; )"
 
   #
   # Check ownership
@@ -486,7 +486,7 @@ EOF
     assert "Already the defined ownership (${blue}$item_owner:$item_group${normal}) for: ${blue}$item${normal}"
   else
     report "Saving rollback for permissions change on: ${blue}$item${normal}"
-    rollback_cmd info "YOU SHOULD: chown $owner:$group '$item'"
+    rollback_cmd info "YOU SHOULD: chown $owner:$group -- '$item'"
     report "Setting ownership for $item (wanted: $item_owner:$item_group, existing: $owner:$group)"
     cmd chown "$item_owner:$item_group" -- "$item" # FIXME plain user mode
   fi
@@ -568,7 +568,7 @@ directory () {
       else
         report "Detected directory which should be present: $dir_name_c"
         rollback_cmd info "YOU SHOULD: rm rf -- '$dir_name'"
-        cmd mkdir -p "$dir_name"
+        cmd mkdir -p -- "$dir_name"
         trigger_run=1
       fi
     ;;
@@ -665,7 +665,7 @@ file () {
   # Update the target file content if it's different than the master file
   #
   if [ -e "$file_name" ]; then
-    if cmp -s "$file_name" "$files$file_name"; then
+    if cmp -s -- "$file_name" "$files$file_name"; then
       assert "Already present: $file_name_c"
     else
       report "File with differences: $file_name_c"
@@ -677,8 +677,8 @@ file () {
     fi
   else
     report "Setting up new file: $file_name_c"
-    cmd diff -Nau "$file_name" "$files$file_name" || :
-    rollback_cmd info "YOU SHOULD: rm -f '$file_name'"
+    cmd diff -Nau -- "$file_name" "$files$file_name" || :
+    rollback_cmd info "YOU SHOULD: rm -f -- '$file_name'"
     rollback_cmd info "YOU SHOULD TRY (IF EMPTY): rmdir '${file_name%/*}'"
     cmd mkdir -p -- "${file_name%/*}"
     cmd cp -f -- "$files$file_name" "${file_name%/*}/"
@@ -727,7 +727,7 @@ pkg () {
   local trigger=''
   local packages="$(
     COLUMNS=200 dpkg -l | while read -r s p _; do
-      [ "$s" = 'ii' ] && printf ':%s:' "$p" || :
+      [ "$s" = 'ii' ] && printf -- ':%s:' "$p" || :
     done
   )"
 
@@ -1156,8 +1156,8 @@ run_op_init () {
   # If still didn't exit, we're going to launch operations.
   # Initialize the log.
   #
-  (umask 077; mkdir -p "${log_file%/*}"; )
-  ln -sf "$log_file" "$work_dir/logs/latest"
+  (umask 077; mkdir -p -- "${log_file%/*}"; )
+  ln -sf -- "$log_file" "$work_dir/logs/latest"
 
   #
   # Initially it was intended for root, but now can run as plain user
@@ -1172,22 +1172,22 @@ run_op_init () {
   #
   # Block parallel runs from ourself
   #
-  if mkdir -p "${lock%/*}" && mkdir "$lock"; then
-    trap 'notify_run; [ -r "$lock" ] && rm -rf "$lock"; exit' EXIT
+  if mkdir -p -- "${lock%/*}" && mkdir -- "$lock"; then
+    trap 'notify_run; [ -r "$lock" ] && rm -rf -- "$lock"; exit' EXIT
     echo "$$" > "$lock/PID"
   else
     if [ -e $lock/PID ]; then
-      bad_pid="$( cat "$lock/PID" )"
+      bad_pid="$( cat -- "$lock/PID" )"
       if kill -0 $bad_pid 2>/dev/null; then
         error "Other instance is running, or there is a staled lock. Exiting."
         error "Save this information for report:
-  $( stat $lock )
+  $( stat -- $lock )
   PID: ${bad_pid:-'UNKNOWN'}
   $(ps auxfwww | grep "$bad_pid")
   "
       else
         info "Removing stalled lock and re-executing"
-        rm -rf "$lock"
+        rm -rf -- "$lock"
         ./$op "$@"
         exit
       fi
@@ -1294,7 +1294,7 @@ gen () {
 
   while [ "$#" -gt 0 ]; do
     case $1 in
-      '') >&2 op_help 1 ;;
+      '') die "$( doc "$op" help )" ;;
       -p|-perms|--perms|perms|permissions) p=1; shift ;;
       *)
         if [ -d "$1" ] || [ -f "$1" ]; then
@@ -1307,17 +1307,17 @@ gen () {
     esac
   done
 
-  [ -e "$path" ] || >&2 op_help 1
+  [ -e "$path" ] || die "$( doc "$op" help )"
 
   local o g m n
   while read -r o g m n; do
     if [ -d "$n" ]; then
-      printf "directory -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
+      printf -- "directory -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
     elif [ -f "$n" ]; then
       if [ "$p" -eq 0 ]; then
-        printf "file -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
+        printf -- "file -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
       else
-        printf "permissions -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
+        printf -- "permissions -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
       fi
     fi
   done <<EOF
@@ -1363,7 +1363,7 @@ while [ $# -gt 0 ]; do
       case $* in
         (*'list'*|*'-l'*|*'--list'*)
           for i in "$work_dir"/play/*; do
-            printf '%s\n' "${i##$work_dir/play/}"
+            printf -- '%s\n' "${i##$work_dir/play/}"
           done
           exit
         ;;
@@ -1382,7 +1382,7 @@ while [ $# -gt 0 ]; do
           error "Unknown operation type: $2"
           error "List of known operations:"
           for i in "$work_dir"/play/*; do
-            printf ' %s\n' "${i##$work_dir/play/}" >&2
+            printf -- ' %s\n' "${i##$work_dir/play/}" >&2
           done
           exit 1
         fi
@@ -1394,7 +1394,7 @@ while [ $# -gt 0 ]; do
       case $* in
         (*'list'*|*'-l'*|*'--list'*)
           for i in "$work_dir"/requests/*; do
-            printf '%s\n' "${i##$work_dir/requests/}"
+            printf -- '%s\n' "${i##$work_dir/requests/}"
           done
           return
         ;;
@@ -1412,7 +1412,7 @@ while [ $# -gt 0 ]; do
           error "Unknown request type: $2"
           error "List of known requests:"
           for i in $work_dir/requests/*; do
-            printf '%s\n' "${i##$work_dir/requests/}"
+            printf -- '%s\n' "${i##$work_dir/requests/}"
           done
           die "$( doc "$op" help )"
         fi
