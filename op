@@ -141,7 +141,7 @@ log () {
   local yellow=""
   local blue=""
   local magenta=""
-  local msg="$(echo -- "$*" | sed -r 's/\x1b\[[0-9;]*m?//g')"
+  local msg="$(printf --  "%s" "$*" | sed -r 's/\x1b\[[0-9;]*m?//g')"
 
   printf -- '[%s] [%s] %s\n' \
     "$(now)" "${USER:+$USER}${SUDO_USER:+"/$SUDO_USER"}" "$msg" >> "$log_file";
@@ -404,7 +404,7 @@ rollback_cmd () {
 #cut#
 undo_last_files () {
   for file in find "$rollback_dir/latest/"; do
-    echo found "$file"
+    printf -- "Found: %s\n" "$file"
   done
 }
 
@@ -939,7 +939,7 @@ EOF
       # Check group users
       #
       local u
-      echo "$users" | tr ',' '\n' | while read -r u; do
+      printf -- "%s\n" "$users" | tr ',' '\n' | while read -r u; do
         [ -n "$u" ] || continue
         if getent group | grep "$u" | grep -q "$name"; then
           assert "Already in group $name for user $u"
@@ -1077,7 +1077,7 @@ doc () {
             topics="$topics$newline$topic${line#*#doc#* $topic}"
           }
           local level="${line#*#doc#}"
-          level=$( echo "$level" | cut -d ' ' -f 1 )
+          level="${level%% *}"
           if [ "$level" = ' ' ]; then
             level=1
             line=${line#*#doc# }
