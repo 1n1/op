@@ -238,14 +238,14 @@ cmd () {
   if [ "$trial" = 0 ]; then
     notify
     if [ "$verbose" = 2 ]; then
-      info "$*"
+      info "$tag $*"
     fi
     "$@" 2>&1 | while read -r line; do
       printf -- '%s\n' "$line"
-      log "$line"
+      log "$tag $line"
     done
   else
-    printf -- "$normal[${magenta}TRIAL${normal}] %s\n" "$*"
+    printf -- "$normal[${magenta}TRIAL${normal}] $tag %s\n" "$*"
   fi
 }
 
@@ -297,17 +297,21 @@ notify () {
 #
 #cut#
 notify_run () {
+
+  local tag="$normal[${cyan}notify${normal}] "
+
   if [ "$notify_enabled" = 1 ] && [ "$notify" = 1 ]; then
-    info "Running notification"
+    info "$tag Running notification"
     if [ -e "$log_file" ]; then
+      # Send the notification and log the server response
       if response="$( curl -X POST -d @$log_file $http_options )"; then
-        info "Reponse received..."
+        info "$tag Reponse received..."
         printf -- '%s\n' "$response" | while read -r line; do info "$line"; done
       else
-        error "Could not notify, Curl error code: $?"
+        error "$tag Could not notify, Curl error code: $?"
       fi
     else
-      error "Could not notify, unreadable: $log_file"
+      error "$tag Could not notify, unreadable: $log_file"
     fi
   fi
 }
@@ -330,6 +334,7 @@ rollback_path () {
 
   local file="$1"
   local target="$rollback_dir/$run_id"
+  local tag="$normal[${cyan}rollback${normal}] "
 
   if [ -f "$1" ] || [ -d "$1" ]; then
 
@@ -345,11 +350,11 @@ rollback_path () {
       cmd ln -s -- "$rollback_dir/$run_id" "$rollback_dir/latest"
     fi
 
-    report "Saving rollback: $file"
+    report "$tag Saving rollback: $file"
     cmd mkdir -p -- "$target$( dirname "$file" )"
     cmd cp -a -- "$file" "$target$file"
   else
-    error "Cannot read for rollback: $file"
+    error "$tag Cannot read for rollback: $file"
   fi
 }
 
@@ -370,6 +375,7 @@ rollback_cmd () {
 
   local l="$rollback_dir/latest.undo"
   local target="$rollback_dir/${run_id}.undo"
+  local tag="$normal[${cyan}rollback${normal}] "
 
   cmd mkdir -p -- "$target"
 
@@ -384,7 +390,7 @@ rollback_cmd () {
     cmd ln -s -- "$rollback_dir/${run_id}.undo" "$l"
   fi
 
-  report "Saving rollback: $*"
+  report "$tag Saving rollback: $*"
   if [ "$trial" = 1 ]; then
     cmd printf -- '%s\n' "$*" \>\> "$target/steps"
   else
@@ -403,8 +409,11 @@ rollback_cmd () {
 #
 #cut#
 undo_last_files () {
+
+  local tag="$normal[${cyan}undo${normal}] "
+
   for file in find "$rollback_dir/latest/"; do
-    printf -- "Found: %s\n" "$file"
+    printf -- "$tag Found: %s\n" "$file"
   done
 }
 
@@ -467,8 +476,9 @@ permissions () {
   local owner=''
   local group=''
   local mode=''
+  local tag="$normal[${cyan}perms${normal}] "
 
-  [ -r "$item" ] || die "Cannot read: $1"
+  [ -r "$1" ] || die "Cannot read: $1"
 
   #
   # Obtain current values
@@ -483,11 +493,11 @@ EOF
   # Check ownership
   #
   if [ "${owner}:${group}" = "${item_owner}:${item_group}" ]; then
-    assert "Already the defined ownership (${blue}$item_owner:$item_group${normal}) for: ${blue}$item${normal}"
+    assert "$tag Already the defined ownership (${blue}$item_owner:$item_group${normal}) for: ${blue}$item${normal}"
   else
-    report "Saving rollback for permissions change on: ${blue}$item${normal}"
+    report "$tag Saving rollback for permissions change on: ${blue}$item${normal}"
     rollback_cmd info "YOU SHOULD: chown $owner:$group -- '$item'"
-    report "Setting ownership for $item (wanted: $item_owner:$item_group, existing: $owner:$group)"
+    report "$tag Setting ownership for $item (wanted: $item_owner:$item_group, existing: $owner:$group)"
     cmd chown "$item_owner:$item_group" -- "$item" # FIXME plain user mode
   fi
 
@@ -495,11 +505,11 @@ EOF
   # Check permissions
   #
   if [ "$mode" = "$item_mode" ]; then
-    assert "Already the defined mode (${blue}$item_mode${normal}) for: ${blue}$item${normal}"
+    assert "$tag Already the defined mode (${blue}$item_mode${normal}) for: ${blue}$item${normal}"
    else
-    report "Saving rollback for permissions change on: $item"
+    report "$tag Saving rollback for permissions change on: $item"
     rollback_cmd info "YOU SHOULD: chmod $mode -- '$item'"
-    report "Setting up permissions for $item (wanted: $item_mode, existing: $mode)"
+    report "$tag Setting up $item (wanted: $item_mode, existing: $mode)"
     cmd chmod "$item_mode" -- "$item" # FIXME plain user mode
   fi
 }
@@ -516,7 +526,6 @@ EOF
 directory () {
 
   local args="$*"
-  local error="Syntax error on: directory $args"
   local dir_ensure='present'
   local dir_group='root'
   local dir_owner='root'
@@ -524,19 +533,21 @@ directory () {
   local dir_name=''
   local trigger=''
   local trigger_run=0
+  local tag="$normal[${cyan}directory${normal}] "
+  local error="Syntax error: $args"
 
   #
   # Parse our arguments
   #
   while [ $# -gt 0 ]; do
     case $1 in
-      -e|--ensure|ensure)   dir_ensure=${2:?"$error"}  ;;
-      -g|--group|group)     dir_group=${2:?"$error"}   ;;
-      -o|--owner|owner)     dir_owner=${2:?"$error"}   ;;
-      -m|--mode|mode)       dir_mode=${2:?"$error"}    ;;
-      -n|--name|name)       dir_name=${2:?"$error"}    ;;
-      -t|--trigger|trigger) trigger=${2:?"$error"}     ;;
-      *) die "Syntax error, unknown argument to directory: $1" ;;
+      -e|--ensure|ensure)   dir_ensure=${2:?"$tag $error"}  ;;
+      -g|--group|group)     dir_group=${2:?"$tag $error"}   ;;
+      -o|--owner|owner)     dir_owner=${2:?"$tag $error"}   ;;
+      -m|--mode|mode)       dir_mode=${2:?"$tag $error"}    ;;
+      -n|--name|name)       dir_name=${2:?"$tag $error"}    ;;
+      -t|--trigger|trigger) trigger=${2:?"$tag $error"}     ;;
+      *) die "$tag syntax error, unknown argument: $1" ;;
     esac
       shift 2
   done
@@ -544,7 +555,7 @@ directory () {
   #
   # We really NEED a directory name.
   #
-  [ -n "$dir_name" ] || die "Syntax error, 'directory' needs a 'name' ($args)"
+  [ -n "$dir_name" ] || die "$tag syntax error, a 'name' is needed ($args)"
   dir_name_c="${blue}${dir_name}${normal}"
 
   #
@@ -553,27 +564,27 @@ directory () {
   case $dir_ensure in
     absent)
       if [ -d "$dir_name" ]; then
-        report "Detected directory which should be absent: $dir_name_c"
+        report "$tag Remove, because should be absent: $dir_name_c"
         rollback_path "$dir_name"
         cmd rm -fr -- "$dir_name"
         trigger_run=1
       else
-        assert "Directory is absent: $dir_name_c"
+        assert "$tag Directory is absent: $dir_name_c"
       fi
       return
     ;;
     present)
       if [ -d "$dir_name" ]; then
-        assert "Already present: $dir_name_c"
+        assert "$tag Already present: $dir_name_c"
       else
-        report "Detected directory which should be present: $dir_name_c"
+        report "$tag Create, becasue should be present: $dir_name_c"
         rollback_cmd info "YOU SHOULD: rm rf -- '$dir_name'"
         cmd mkdir -p -- "$dir_name"
         trigger_run=1
       fi
     ;;
     *)
-      die "Syntax error, unknown argument to 'ensure' in: directory $args"
+      die "$tag Syntax error, unknown argument to 'ensure' in: $args"
     ;;
   esac
 
@@ -591,7 +602,7 @@ directory () {
   if [ "$trigger_run" = 1 ]; then
     if [ -n "$trigger" ]; then
       trigger_c="${blue}$trigger${normal}"
-      report "Changes on $dir_name_c, triggers: $trigger_c"
+      report "$tag Changes on $dir_name_c, triggers: $trigger_c"
       cmd $trigger
     fi
   fi
@@ -609,7 +620,6 @@ directory () {
 file () {
 
   local args="$*"
-  local error="Syntax error on: file $args"
   local file_ensure='present'
   local file_group='root'
   local file_owner='root'
@@ -617,19 +627,21 @@ file () {
   local file_name=''
   local file_trigger=''
   local file_trigger_run=0
+  local tag="$normal[${cyan}file${normal}] "
+  local error="Syntax error: $args"
 
   #
   # Parse the arguments
   #
   while [ $# -gt 0 ]; do
     case $1 in
-      -e|--ensure|ensure)   file_ensure=${2:?"$error"}  ;;
-      -g|--group|group)     file_group=${2:?"$error"}   ;;
-      -o|--owner|owner)     file_owner=${2:?"$error"}   ;;
-      -m|--mode|mode)       file_mode=${2:?"$error"}    ;;
-      -n|--name|name)       file_name=${2:?"$error"}    ;;
-      -t|--trigger|trigger) file_trigger=${2:?"$error"} ;;
-      *) die "$error" ;;
+      -e|--ensure|ensure)   file_ensure=${2:?"$tag $error"}  ;;
+      -g|--group|group)     file_group=${2:?"$tag $error"}   ;;
+      -o|--owner|owner)     file_owner=${2:?"$tag $error"}   ;;
+      -m|--mode|mode)       file_mode=${2:?"$tag $error"}    ;;
+      -n|--name|name)       file_name=${2:?"$tag $error"}    ;;
+      -t|--trigger|trigger) file_trigger=${2:?"$tag $error"} ;;
+      *) die "$tag $error" ;;
     esac
     shift 2
   done
@@ -637,7 +649,7 @@ file () {
   #
   # We really NEED a file name
   #
-  [ -n "$file_name" ] || die "Syntax error, 'file' needs a 'name', $args"
+  [ -n "$file_name" ] || die "$tag Syntax error, a 'name' is needed: $args"
   file_name_c="${blue}${file_name}${normal}"
 
   #
@@ -646,10 +658,10 @@ file () {
   case $file_ensure in
     absent)
       if [ -f "$file_name" ]; then
-        report "Removing existing file, should be absent: $file_name_c"
+        report "$tag Remove, because should be absent: $file_name_c"
         cmd rm -f  -- "$file_name"
       else
-        assert "Already absent: $file_name_c"
+        assert "$tag Already absent: $file_name_c"
       fi
       return
     ;;
@@ -657,7 +669,7 @@ file () {
       :
     ;;
     *)
-      die "Syntax error, unknown argument to 'ensure' in 'file', $args"
+      die "$tag Syntax error, unknown argument to 'ensure': $args"
     ;;
   esac
 
@@ -666,17 +678,18 @@ file () {
   #
   if [ -e "$file_name" ]; then
     if cmp -s -- "$file_name" "$files$file_name"; then
-      assert "Already present: $file_name_c"
+      assert "$tag Already present and content match: $file_name_c"
     else
-      report "File with differences: $file_name_c"
+      report "$tag Differences detected: $file_name_c"
+      # FIXME binary files
       cmd diff -Nau -- "$file_name" "$files$file_name" || :
       rollback_path "$file_name"
-      report "Setting up: $file_name_c"
+      report "$tag Setting up: $file_name_c"
       cmd cp -f -- "$files$file_name" "${file_name%/*}/"
       file_trigger_run='1'
     fi
   else
-    report "Setting up new file: $file_name_c"
+    report "$tag Setting up new file: $file_name_c"
     cmd diff -Nau -- "$file_name" "$files$file_name" || :
     rollback_cmd info "YOU SHOULD: rm -f -- '$file_name'"
     rollback_cmd info "YOU SHOULD TRY (IF EMPTY): rmdir '${file_name%/*}'"
@@ -697,7 +710,7 @@ file () {
   #
   if [ "$file_trigger_run" = 1 ]; then
     if [ -n "$file_trigger" ]; then
-      report "Changes on $file_name_c, triggers: $file_trigger"
+      report "$tag Changes on $file_name_c, triggers: $file_trigger"
       cmd $file_trigger
     fi
   fi
@@ -730,6 +743,7 @@ pkg () {
       [ "$s" = 'ii' ] && printf -- ':%s:' "$p" || :
     done
   )"
+  local tag="$normal[${cyan}pkg${normal}] "
 
   #
   # A package maybe defined as absent or present
@@ -738,10 +752,10 @@ pkg () {
     -a|--absent|absent)   cmd=absent  ;;
     -p|--present|present) cmd=present ;;
     -t|--trigger|trigger)
-      file_trigger=${2:?"$error"};
+      file_trigger=${2:?"$tag $error"};
       file_trigger_c="${blue}$2${normal}"
     ;;
-    *) error "Bad usage of pkg" ;;
+    *) error "$tag Syntax error: $1" ;;
   esac
   shift
 
@@ -754,11 +768,11 @@ pkg () {
       *:"$pkg":*)
         case $cmd in
           present)
-            assert "Already installed: $pkg_c"
+            assert "$tag Already installed: $pkg_c"
           ;;
           absent)
             to_process="$to_process $pkg"
-            report "Selected to purge: $pkg_c"
+            report "$tag Selected to purge: $pkg_c"
           ;;
         esac
       ;;
@@ -766,10 +780,10 @@ pkg () {
         case $cmd in
           present)
             to_process="$to_process $pkg"
-            report "Selected to install: $pkg_c"
+            report "$tag Selected to install: $pkg_c"
           ;;
           absent)
-            assert "Already purged: $pkg_c"
+            assert "$tag Already purged: $pkg_c"
           ;;
         esac
       ;;
@@ -783,7 +797,7 @@ pkg () {
     to_process="${to_process# }"
     local cmd_c="${blue}$cmd${normal}"
     local to_process_c="${blue}$to_process${normal}"
-    report "Ensuring $cmd_c for: $to_process_c"
+    report "$tag Ensuring $cmd_c for: $to_process_c"
     case $cmd in
       present)
         rollback_cmd "apt-get remove --purge $to_process"
@@ -796,7 +810,7 @@ pkg () {
     esac
     if [ -n "$trigger" ]; then
       trigger_c="${blue}$trigger${normal}"
-      report "Changes on $to_process_c, triggers: $trigger_c"
+      report "$tag Changes on $to_process_c, triggers: $trigger_c"
       cmd $trigger
     fi
   fi
@@ -814,6 +828,9 @@ pkg () {
 #
 #cut#
 aptkey () {
+
+  local tag="$normal[${cyan}aptkey${normal}] "
+
   case $1 in
     -p|--present|present)
       local file="$files$2"
@@ -822,13 +839,13 @@ aptkey () {
           awk '/gpg: pub /{print $3}'
       )"
       if [ -z "$key_id" ]; then
-        error "Invalid key file: $file"
+        error "$tag Invalid key file: $file"
         return
       fi
       if apt-key list | grep -q -- "$key_id"; then
-        assert "Already present: $key_id"
+        assert "$tag Already present: $key_id"
       else
-        report "Importing not present key: $key_id"
+        report "$tag Importing not present key: $key_id"
         rollback_cmd apt-key del "$file"
         cmd apt-key add "$file"
       fi
@@ -836,14 +853,14 @@ aptkey () {
     -a|--absent|absent)
       local key_id=$1
       if apt-key list | grep -q -- "$key_id"; then
-        report "Removing present key: $key_id (should be absent)"
+        report "$tag Removing present key: $key_id (should be absent)"
         rollback_cmd apt-key add "$key_id"
         cmd apt-key del "$key_id"
       else
-        assert "Already absent: $key_id"
+        assert "$tag Already absent: $key_id"
       fi
     ;;
-    *) error "Unknown command to aptkey. Skipping: $*"; return ;;
+    *) error "$tag Unknown command to aptkey. Skipping: $*"; return ;;
   esac
 }
 
@@ -864,22 +881,23 @@ aptkey () {
 group () {
 
   local args="$*"
-  local error="Syntax error on: group $args"
   local ensure='present';
   local name='';
   local gid='';
   local members='';
+  local tag="$normal[${cyan}group${normal}] "
+  local error="Syntax error: $args"
 
   #
   # Parse the arguments
   #
   while [ $# -gt 0 ]; do
     case $1 in
-      -e|--ensure|ensure)   ensure=${2:?"$error"}  ;;
-      -n|--name|name)       name=${2:?"$error"}    ;;
-      -g|--gid|gid)         gid=${2:?"$error"}     ;;
-      -m|--members|members) members=${2:?"$error"} ;;
-      *) die "Bad syntax to 'group': $*" ;;
+      -e|--ensure|ensure)   ensure=${2:?"$tag $error"}  ;;
+      -n|--name|name)       name=${2:?"$tag $error"}    ;;
+      -g|--gid|gid)         gid=${2:?"$tag $error"}     ;;
+      -m|--members|members) members=${2:?"$tag $error"} ;;
+      *) die "$tag Bad syntax to 'group': $*" ;;
     esac
     shift 2
   done
@@ -887,7 +905,7 @@ group () {
   #
   # Our group requires a name
   #
-  [ -n "$name" ] || die "'group' needs a 'name'. $error"
+  [ -n "$name" ] || die "$tag a 'name' is needed, $error"
 
   #
   # And it maybe absent or present
@@ -895,19 +913,21 @@ group () {
   case $ensure in
     absent)
       if getent group "$name" >/dev/null 2>&1; then
-        report "Removing existing group: $name (should be absent)"
-        rollback_cmd info "YOU SHOULD CREATE GROUP: $(getent group "$name")"
+        report "$tag Detected present definition: $name"
+        report "$tag Remove, because should be absent: $name"
+        rollback_cmd info "$tag YOU SHOULD CREATE GROUP: $(getent group "$name")"
         cmd groupdel -- "$name"
       else
-        assert "Already absent: $name"
+        assert "$tag Already absent: $name"
       fi
       return
     ;;
     present)
       if getent group "$name" >/dev/null 2>&1; then
-        assert "Already present: $name"
+        assert "$tag Already present: $name"
       else
-        report "Adding absent group: $name (should be present)"
+        report "$tag Detected missing definition: $name"
+        report "$tag Add, because should be present: $name"
         local g=''
         [ -n "${gid## }" ] && g="$g -g $gid"
         cmd groupadd $g -- "$name"
@@ -927,9 +947,9 @@ EOF
 
       if [ -n "$gid" ]; then
         if [ "$gi" = "$gid" ]; then
-          assert "Already the defined GID: $gid"
+          assert "$tag Already the defined GID: $gid"
         else
-          report "Fixing the GID for group: $name (wanted: $gid, existing: $gi)"
+          report "$tag Change GID for group: $name (wanted: $gid, existing: $gi)"
           rollback_cmd groupmod -g $gi -- "$name"
           cmd groupmod -g "$gid" -- "$name"
         fi
@@ -942,15 +962,15 @@ EOF
       printf -- "%s\n" "$users" | tr ',' '\n' | while read -r u; do
         [ -n "$u" ] || continue
         if getent group | grep "$u" | grep -q "$name"; then
-          assert "Already in group $name for user $u"
+          assert "$tag $u is already in: $name"
         else
-          report "Setting group $name for user $u"
+          report "$tag Setting group $name for user $u"
           rollback_cmd gpasswd -d $u -- "$name"
           cmd usermod -a -G "$name" -- "$u"
         fi
       done
     ;;
-    *) die "$error"
+    *) die "$tag $error"
   esac
 }
 
@@ -966,7 +986,6 @@ EOF
 user () {
 
   local args="$*"
-  local error="Syntax error on: user $args"
   local ensure='present';
   local description='';
   local login='';
@@ -974,41 +993,45 @@ user () {
   local pass='';
   local shell='';
   local home='';
+  local tag="$normal[${cyan}user${normal}] "
+  local error="Syntax error: $args"
 
   while [ $# -gt 0 ]; do
     case $1 in
-      -d|--description|description) description=${2:?"$error"} ;;
-      -e|--ensure|ensure)           ensure=${2:?"$error"}      ;;
-      -g|--groups|groups)           groups=${2:?"$error"}      ;;
-      -h|--home|home)               home=${2:?"$error"}        ;;
-      -l|--login|login)             login=${2:?"$error"}       ;;
-      -p|--pass|pass)               pass=${2:?"$error"}        ;;
-      -s|--shell|shell)             shell=${2:?"$error"}       ;;
-      *) die "$error" ;;
+      -d|--description|description) description=${2:?"$tag $error"} ;;
+      -e|--ensure|ensure)           ensure=${2:?"$tag $error"}      ;;
+      -g|--groups|groups)           groups=${2:?"$tag $error"}      ;;
+      -h|--home|home)               home=${2:?"$tag $error"}        ;;
+      -l|--login|login)             login=${2:?"$tag $error"}       ;;
+      -p|--pass|pass)               pass=${2:?"$tag $error"}        ;;
+      -s|--shell|shell)             shell=${2:?"$tag $error"}       ;;
+      *) die "$tag $error" ;;
     esac
     shift 2
   done
 
-  [ -n "$login" ] || die "'user' needs a 'login'. $error"
-  [ -n "$pass" ] ||  die "'user' needs a 'pass'. $error"
+  [ -n "$login" ] || die "$tag a 'login' is needed: $error"
+  [ -n "$pass" ] ||  die "$tag a 'pass' is needed: $error"
 
   case $ensure in
     absent)
       if getent passwd "$login" >/dev/null 2>&1; then
         rollback_cmd info "YOUR SHOULD CREATE: $(getent passwd "$login")"
-        report "Removing existing user: $login (should be absent)"
+        report "$tag Detected existing user: $login"
+        report "$tag Remove, because should be absent: $login"
         cmd userdel -- "$login"
       else
-        assert "Already absent: $login"
-        [[ "$home" ]] && [[ -d "$home" ]] && info "Still exists: $home"
+        assert "$tag Already absent: $login"
+        [[ "$home" ]] && [[ -d "$home" ]] && report "$tag Still exists: $home"
       fi
       return
     ;;
     present)
       if getent passwd "$login" >/dev/null 2>&1; then
-        assert "Already present: $login"
+        assert "$tag Already present: $login"
       else
-        report "Adding absent user: $login (should be present)"
+        report "$tag Detected absent definition: $login"
+        report "$tag Add, because should be present: $login"
         local opts=''
         [ -n "$groups" ] && opts="$opts -g $(echo $groups | sed 's/,/ -g /g')"
         [ -n "$home" ] && opts="$opts -d $home"
@@ -1021,7 +1044,7 @@ user () {
     $( getent passwd "$login" )
 EOF
     ;;
-    *) die "$error" ;;
+    *) die "$tag $error" ;;
   esac
 }
 
@@ -1132,6 +1155,7 @@ doc () {
 doc_title () {
   local level="$1"
   local title="$2"
+
   case $level in
     1)  printf -- '# %s\n' "$title" ;;
     2)  printf -- '## %s\n' "$title" ;;
@@ -1152,6 +1176,9 @@ doc_title () {
 #
 #cut#
 run_op_init () {
+
+  local tag="$normal[${cyan}init${normal}] "
+
   #
   # If still didn't exit, we're going to launch operations.
   # Initialize the log.
@@ -1163,11 +1190,11 @@ run_op_init () {
   # Initially it was intended for root, but now can run as plain user
   #
   if [ "$(id -u)" -ne 0 ]; then
-    info "Running as plain user, some operations may require higher privileges."
+    info "$tag Running as plain user, some operations may require higher privileges."
   fi
 
-  [ -d "$work_dir/play" ] || die "You need to define some operations first."
-  [ "$( echo "$work_dir"/play/* )" ] || die "You need to define some operations first."
+  [ -d "$work_dir/play" ] || die "$tag You need to define some operations first."
+  [ "$( echo "$work_dir"/play/* )" ] || die "$tag You need to define some operations first."
 
   #
   # Block parallel runs from ourself
@@ -1179,20 +1206,20 @@ run_op_init () {
     if [ -e $lock/PID ]; then
       bad_pid="$( cat -- "$lock/PID" )"
       if kill -0 $bad_pid 2>/dev/null; then
-        error "Other instance is running, or there is a staled lock. Exiting."
-        error "Save this information for report:
+        error "$tag Other instance is running, or there is a staled lock. Exiting."
+        error "$tag Save this information for report:
   $( stat -- $lock )
   PID: ${bad_pid:-'UNKNOWN'}
   $(ps auxfwww | grep "$bad_pid")
   "
       else
-        info "Removing stalled lock and re-executing"
+        info "$tag Removing stalled lock and re-executing"
         rm -rf -- "$lock"
         ./$op "$@"
         exit
       fi
     fi
-    die "Could not gain lock. Exiting."
+    die "$tag Could not gain lock. Exiting."
   fi
 }
 
@@ -1206,13 +1233,16 @@ run_op_init () {
 #cut#
 run_op () {
 
+  local tag="$normal[${cyan}run${normal}] "
+
   run_op_init
+
   #
   # If no operation is given run them all.
   #
-  if [ "$op_default" = all ]; then
+  if [ "$default_op" = all ]; then
     if dir_is_empty "$work_dir/play"; then
-      die "You need to define some operations to run."
+      die "$tag You need to define some operations to run."
     else
       # syntax check all operation files
       for f in "$work_dir/play/"*; do sh -n "$f" || exit; done
@@ -1221,18 +1251,18 @@ run_op () {
       exit
     fi
   # Or if some specific operation is given, run only that one.
-  elif [ -e "$op_default" ]; then
-    if sh -n -- "$op_default"; then
-      if . "$op_default"; then
-        assert "Finished ${green}OK${normal}: $op_default"
+  elif [ -e "$default_op" ]; then
+    if sh -n -- "$default_op"; then
+      if . "$default_op"; then
+        assert "$tag Finished ${green}OK${normal}: $default_op"
       else
-        die "exit with code: ${red}${?}${normal} $op_default"
+        die "$tag Problem playing: ${red} $default_op ${normal}"
       fi
     else
-      die "invalid syntax in: ${red}${op_default}${normal}"
+      die "$tag invalid syntax in: ${red}${default_op}${normal}"
     fi
   else
-    die "could not read file: ${red}${op_default}${normal}"
+    die "$tag could not read file: ${red}${default_op}${normal}"
   fi
 }
 
@@ -1247,23 +1277,26 @@ run_op () {
 #
 #cut#
 import_path () {
+
+  local tag="$normal[${cyan}import${normal}] "
+
   run_op_init
   local path="$1"
   if [ -r "$path" ]; then
     if [ -r "$files/$path" ]; then
-      die "Already exists: $files/$path"
+      die "$tag Already exists: $files/$path"
     else
       d="$files/${path%/*}"
       if cmd mkdir -p -- "$d"; then
-        report "Added directory: $d"
+        report "$tag Added directory: $d"
         cmd cp -a -- "$path" "${d:?'ooops'}/"
-        report "Added: $path"
+        report "$tag Added: $path"
       else
-        die "Couldn't import: $2"
+        die "$tag Couldn't perform the import of: $path"
       fi
     fi
   else
-    die "Cannot read: $2"
+    die "$tag Cannot read: $path"
   fi
 }
 
@@ -1373,10 +1406,10 @@ while [ $# -gt 0 ]; do
       esac
       if [ "$#" -ge 2 ]; then
         if [ -e "$work_dir/play/$2" ]; then
-          op_default="$work_dir/play/$2"
+          default_op="$work_dir/play/$2"
           shift 2
         elif [ "$2" = all ]; then
-          op_default="all"
+          default_op="all"
           shift 2
         else
           error "Unknown operation type: $2"
@@ -1404,7 +1437,7 @@ while [ $# -gt 0 ]; do
       esac
       if [ "$#" -ge 2 ]; then
         if [ -e "$work_dir/requests/$2" ]; then
-          op_default="$work_dir/requests/$2"
+          default_op="$work_dir/requests/$2"
           shift 2
           request_args="$*"
           shift "$#"
@@ -1471,7 +1504,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-op_default="${op_default:-all}"
+default_op="${default_op:-all}"
 run_op
 
 #doc#3 See also
