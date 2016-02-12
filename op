@@ -1156,6 +1156,11 @@ doc_title () {
   local level="$1"
   local title="$2"
 
+  case $title in
+    help) return ;;
+    *)    :      ;;
+  esac
+
   case $level in
     1)  printf -- '# %s\n' "$title" ;;
     2)  printf -- '## %s\n' "$title" ;;
@@ -1360,7 +1365,6 @@ EOF
 
 
 #doc#3 help
-#
 #     op - the operations tool
 #   
 #     USAGE:
