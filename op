@@ -681,8 +681,7 @@ file () {
       assert "$tag Already present and content match: $file_name_c"
     else
       report "$tag Differences detected: $file_name_c"
-      # FIXME binary files
-      cmd diff -Nau -- "$file_name" "$files$file_name" || :
+      cmd diff -Nu -- "$file_name" "$files$file_name" || :
       rollback_path "$file_name"
       report "$tag Setting up: $file_name_c"
       cmd cp -f -- "$files$file_name" "${file_name%/*}/"
@@ -690,7 +689,7 @@ file () {
     fi
   else
     report "$tag Setting up new file: $file_name_c"
-    cmd diff -Nau -- "$file_name" "$files$file_name" || :
+    cmd diff -Nu -- "$file_name" "$files$file_name" || :
     rollback_cmd info "YOU SHOULD: rm -f -- '$file_name'"
     rollback_cmd info "YOU SHOULD TRY (IF EMPTY): rmdir '${file_name%/*}'"
     cmd mkdir -p -- "${file_name%/*}"
