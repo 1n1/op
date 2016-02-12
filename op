@@ -60,7 +60,7 @@ hostname="$( uname -n )"
 #
 #     normal, red, green, yellow, blue, magenta, cyan, white
 #cut#
-normal="$(  tput setaf 9; tput sgr0 )"
+normal="$(  tput sgr 0 )"
 red="$(     tput setaf 1; tput bold )"
 green="$(   tput setaf 2; tput bold )"
 yellow="$(  tput setaf 3; tput bold )"
