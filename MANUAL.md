@@ -35,8 +35,10 @@ reuse in your recipes.
 * ```lock```: The file used to block against parallel sessions.
 * ```verbose```: The verbosity switch (bool, default disabled, 0).
 * ```trial```: The trial switch (bool, default disabled, 0).
-* ```nocolor```: The colors switch (boold, default disabled, 0).
+* ```nocolor```: The colors switch (bool, default disabled, 0).
 * ```hostname```: It contains the hostname at our launch time.
+* ```pkgtool```: Package system (apt, yum).
+
 
 ##  Color variables
 
@@ -259,7 +261,7 @@ Functions related to package management.
 
 ###  function pkg
 
-Ensure given (debian) packages status
+Ensure given packages (debian/redhat) status
 
 Argument order matters, first the orders, last the packages.
 
@@ -321,6 +323,11 @@ Create a markdown title of the given level (1 to 6)
 
 This is an internal function, to initialize runs.
 
+You should not call it.
+
+It setups logging, blocks parallel runs, and initializes the following
+facts (that you can reuse):
+
     USAGE
       run_op_init
 
@@ -359,7 +366,6 @@ Not tested against special files (links, devices, sockets, etc).
       gen /usr/bin --perms     # generate rules for permissions()
 
 ###  help
-
     op - the operations tool
 
     USAGE:
