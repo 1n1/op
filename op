@@ -39,8 +39,10 @@ set -eu
 # * ```lock```: The file used to block against parallel sessions.
 # * ```verbose```: The verbosity switch (bool, default disabled, 0).
 # * ```trial```: The trial switch (bool, default disabled, 0).
-# * ```nocolor```: The colors switch (boold, default disabled, 0).
+# * ```nocolor```: The colors switch (bool, default disabled, 0).
 # * ```hostname```: It contains the hostname at our launch time.
+# * ```pkgtool```: Package system (apt, yum).
+#
 #
 #cut#
 version=0.4
@@ -478,7 +480,7 @@ permissions () {
   local mode=''
   local tag="$normal[${cyan}perms${normal}] "
 
-  [ -r "$1" ] || die "Cannot read: $1"
+  [ -r "$1" ] || if [ "$trial" = 0 ]; then die "Cannot read: $1"; fi
 
   #
   # Obtain current values
@@ -681,7 +683,7 @@ file () {
       assert "$tag Already present and content match: $file_name_c"
     else
       report "$tag Differences detected: $file_name_c"
-      cmd diff -Nu -- "$file_name" "$files$file_name" || :
+      diff -Nu -- "$file_name" "$files$file_name" || :
       rollback_path "$file_name"
       report "$tag Setting up: $file_name_c"
       cmd cp -f -- "$files$file_name" "${file_name%/*}/"
@@ -689,7 +691,7 @@ file () {
     fi
   else
     report "$tag Setting up new file: $file_name_c"
-    cmd diff -Nu -- "$file_name" "$files$file_name" || :
+    diff -Nu -- "$file_name" "$files$file_name" || :
     rollback_cmd info "YOU SHOULD: rm -f -- '$file_name'"
     rollback_cmd info "YOU SHOULD TRY (IF EMPTY): rmdir '${file_name%/*}'"
     cmd mkdir -p -- "${file_name%/*}"
@@ -721,7 +723,7 @@ file () {
 #
 #doc#3 function pkg
 #
-# Ensure given (debian) packages status
+# Ensure given packages (debian/redhat) status
 #
 # Argument order matters, first the orders, last the packages.
 #
@@ -737,11 +739,20 @@ pkg () {
   local pkg=''
   local to_process=''
   local trigger=''
-  local packages="$(
-    COLUMNS=200 dpkg -l | while read -r s p _; do
-      [ "$s" = 'ii' ] && printf -- ':%s:' "$p" || :
-    done
-  )"
+  case $pkgtool in
+    apt) local packages="$(
+        COLUMNS=200 dpkg -l | while read -r s p _; do
+          [ "$s" = 'ii' ] && printf -- ':%s:' "$p" || :
+        done
+      )"
+    ;;
+    yum)
+      local packages="$( rpm -qa --qf ":%{NAME}:" )"
+    ;;
+    *)
+      error "Bad fact detected, 'packages' contains '$packages'."
+    ;;
+  esac
   local tag="$normal[${cyan}pkg${normal}] "
 
   #
@@ -799,12 +810,34 @@ pkg () {
     report "$tag Ensuring $cmd_c for: $to_process_c"
     case $cmd in
       present)
-        rollback_cmd "apt-get remove --purge $to_process"
-        cmd apt-get -y install $to_process
+        case $pkgtool in
+          apt)
+            rollback_cmd "apt-get remove --purge $to_process"
+            cmd apt-get -y install $to_process
+          ;;
+          yum)
+            rollback_cmd "yum erase $to_process"
+            cmd yum -y install $to_process
+          ;;
+          *)
+            error "Bad fact detected, 'packages' contains '$packages'."
+          ;;
+        esac
       ;;
       absent)
-        rollback_cmd "apt-get install $to_process"
-        cmd apt-get remove --purge $to_process
+        case $pkgtool in
+          apt)
+            rollback_cmd "apt-get install $to_process"
+            cmd apt-get remove --purge $to_process
+          ;;
+          yum)
+            rollback_cmd "yum install $to_process"
+            cmd yum erase $to_process
+          ;;
+          *)
+            error "Bad fact detected, 'packages' contains '$packages'."
+          ;;
+        esac
       ;;
     esac
     if [ -n "$trigger" ]; then
@@ -1175,6 +1208,11 @@ doc_title () {
 #
 # This is an internal function, to initialize runs.
 #
+# You should not call it.
+#
+# It setups logging, blocks parallel runs, and initializes the following
+# facts (theat you can reuse):
+#
 #     USAGE
 #       run_op_init
 #
@@ -1191,12 +1229,16 @@ run_op_init () {
   ln -sf -- "$log_file" "$work_dir/logs/latest"
 
   #
-  # Initially it was intended for root, but now can run as plain user
+  # Initially op was intended for use as root (UID=0),
+  # but now can run as plain user
   #
   if [ "$(id -u)" -ne 0 ]; then
-    info "$tag Running as plain user, some operations may require higher privileges."
+    info "$tag Running as plain user (some op functions will not work without sudo)."
   fi
 
+  #
+  # We should continue, only if it makes sense
+  #
   [ -d "$work_dir/play" ] || die "$tag You need to define some operations first."
   [ "$( echo "$work_dir"/play/* )" ] || die "$tag You need to define some operations first."
 
@@ -1224,6 +1266,15 @@ run_op_init () {
       fi
     fi
     die "$tag Could not gain lock. Exiting."
+  fi
+
+  # Our facts
+  if [ -f /etc/debian_version ]; then
+    pkgtool='apt'
+  elif [ -f /etc/redhat-release ]; then
+    pkgtool='yum'
+  else
+    error "Unknown or unsupported linux distribution. Patches wellcome."
   fi
 }
 
