@@ -343,7 +343,7 @@ rollback_path () {
     cmd mkdir -p -- "$target"
     if [ -L "$rollback_dir/latest" ]; then
 
-      local current="$( readlink -- $rollback_dir/latest )"
+      local current="$( readlink -- "$rollback_dir/latest" )"
 
       if [ "X$current" != "X$target" ]; then
         cmd ln -fns -- "$rollback_dir/$run_id" "$rollback_dir/latest"
@@ -962,18 +962,17 @@ group () {
         report "$tag Add, because should be present: $name"
         local g=''
         [ -n "${gid## }" ] && g="$g -g $gid"
-        cmd groupadd $g -- "$name"
+        cmd groupadd "$g" -- "$name"
         rollback_cmd info "YOU SHOULD DELETE GROUP: $(getent group "$name")"
       fi
 
       #
       # Check group GID if passed
       #
-      local gr=''
       local p=''
       local gi=''
       local users=''
-      IFS=: read -r gr p gi users <<EOF
+      IFS=: read -r _ p gi users <<EOF
     $( getent group "$name" )
 EOF
 
@@ -982,7 +981,7 @@ EOF
           assert "$tag Already the defined GID: $gid"
         else
           report "$tag Change GID for group: $name (wanted: $gid, existing: $gi)"
-          rollback_cmd groupmod -g $gi -- "$name"
+          rollback_cmd groupmod -g "$gi" -- "$name"
           cmd groupmod -g "$gid" -- "$name"
         fi
       fi
@@ -997,7 +996,7 @@ EOF
           assert "$tag $u is already in: $name"
         else
           report "$tag Setting group $name for user $u"
-          rollback_cmd gpasswd -d $u -- "$name"
+          rollback_cmd gpasswd -d "$u" -- "$name"
           cmd usermod -a -G "$name" -- "$u"
         fi
       done
@@ -1054,7 +1053,7 @@ user () {
         cmd userdel -- "$login"
       else
         assert "$tag Already absent: $login"
-        [[ "$home" ]] && [[ -d "$home" ]] && report "$tag Still exists: $home"
+        [ "$home" ] && [ -d "$home" ] && report "$tag Home still exists: $home"
       fi
       return
     ;;
@@ -1065,16 +1064,12 @@ user () {
         report "$tag Detected absent definition: $login"
         report "$tag Add, because should be present: $login"
         local opts=''
-        [ -n "$groups" ] && opts="$opts -g $(echo $groups | sed 's/,/ -g /g')"
+        [ -n "$groups" ] && opts="$opts -g $(echo "$groups" | sed 's/,/ -g /g')"
         [ -n "$home" ] && opts="$opts -d $home"
         [ -n "$shell" ] && opts="$opts -s $shell"
         cmd useradd $opts -- "$login"
         rollback_cmd info "YOUR SHOULD DELETE: $(getent passwd "$login")"
       fi
-
-      IFS=: read -r gr p gi users <<EOF
-    $( getent passwd "$login" )
-EOF
     ;;
     *) die "$tag $error" ;;
   esac
@@ -1211,7 +1206,7 @@ doc_title () {
 # You should not call it.
 #
 # It setups logging, blocks parallel runs, and initializes the following
-# facts (theat you can reuse):
+# facts (that you can reuse):
 #
 #     USAGE
 #       run_op_init
@@ -1249,26 +1244,28 @@ run_op_init () {
     trap 'notify_run; [ -r "$lock" ] && rm -rf -- "$lock"; exit' EXIT
     echo "$$" > "$lock/PID"
   else
-    if [ -e $lock/PID ]; then
+    if [ -e "$lock/PID" ]; then
       bad_pid="$( cat -- "$lock/PID" )"
-      if kill -0 $bad_pid 2>/dev/null; then
+      if kill -0 "$bad_pid" 2>/dev/null; then
         error "$tag Other instance is running, or there is a staled lock. Exiting."
         error "$tag Save this information for report:
-  $( stat -- $lock )
+  $( stat -- "$lock" )
   PID: ${bad_pid:-'UNKNOWN'}
   $(ps auxfwww | grep "$bad_pid")
   "
       else
         info "$tag Removing stalled lock and re-executing"
         rm -rf -- "$lock"
-        ./$op "$@"
+        ./"$op" "$@"
         exit
       fi
     fi
     die "$tag Could not gain lock. Exiting."
   fi
 
-  # Our facts
+  #
+  # Load our facts database
+  #
   if [ -f /etc/debian_version ]; then
     pkgtool='apt'
   elif [ -f /etc/redhat-release ]; then
@@ -1400,12 +1397,12 @@ gen () {
   local o g m n
   while read -r o g m n; do
     if [ -d "$n" ]; then
-      printf -- "directory -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
+      printf -- "directory -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" "$m" "${n#files}"
     elif [ -f "$n" ]; then
       if [ "$p" -eq 0 ]; then
-        printf -- "file -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
+        printf -- "file -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" "$m" "${n#files}"
       else
-        printf -- "permissions -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" $m "${n#files}"
+        printf -- "permissions -o '%s' -g '%s' -m %s -n '%s'\n" "$o" "$g" "$m" "${n#files}"
       fi
     fi
   done <<EOF
